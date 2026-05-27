@@ -1,0 +1,33 @@
+{
+  "playlist": [
+    {
+      "path": "C:/Users/roder/OneDrive/Desktop/prueba1.exe",
+      "repetitions": 2,
+      "duration": 10,
+      "pause": 0
+    },
+    {
+      "path": "C:/Users/roder/OneDrive/Desktop/prueba2.exe",
+      "repetitions": 1,
+      "duration": 10,
+      "pause": 0
+    },
+    {
+      "path": "C:/Users/roder/OneDrive/Desktop/prueba3.exe",
+      "repetitions": 1,
+      "duration": 10,
+      "pause": 0
+    },
+    {
+      "path": "C:/Users/roder/OneDrive/Desktop/prueba4.exe",
+      "repetitions": 1,
+      "duration": 10,
+      "pause": 0
+    }
+  ],
+  "settings": {
+    "loop_mode": "fixed",
+    "loop_count": 1,
+    "loop_delay": 5
+  }
+}
