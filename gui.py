@@ -41,12 +41,34 @@ DARK_COLORS = {
 }
 
 
+def _apply_dark_titlebar(hwnd):
+    if os.name != "nt":
+        return
+    try:
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(ctypes.c_int(1)),
+            ctypes.sizeof(ctypes.c_int(1)),
+        )
+    except Exception:
+        pass
+
 class OrchestratorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("TinyTask Orchestrator")
         self.root.minsize(600, 380)
         self.root.configure(bg=DARK_COLORS["bg"])
+
+        # Dark title bar on Windows
+        self.root.update_idletasks()
+        try:
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            _apply_dark_titlebar(hwnd)
+        except Exception:
+            pass
 
         # Estado
         config = load_config()
