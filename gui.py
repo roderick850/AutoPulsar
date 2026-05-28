@@ -327,6 +327,7 @@ class OrchestratorApp:
             state="readonly",
         )
         hotkey_combo.pack(side=tk.LEFT, padx=2)
+        ttk.Label(exec_frame, text="(solo ▶ Iniciar todo / ⏹ Detener)", style="Dim.TLabel").pack(side=tk.LEFT, padx=(3, 0))
         hotkey_combo.bind("<<ComboboxSelected>>", self._on_hotkey_change)
 
         # Countdown timer
