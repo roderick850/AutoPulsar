@@ -118,6 +118,12 @@ class MiniBar:
         # Dark title bar — apply after window is realized
         self.root.after(100, lambda: _apply_dark_titlebar(self.root, retries=3))
 
+        # Opacity control - mouse wheel over the bar
+        self._opacity = self.settings.get("mini_bar_opacity", 1.0)
+        self.root.attributes("-alpha", self._opacity)
+        # Bind to Toplevel covers all child widgets via bind tags
+        self.root.bind("<MouseWheel>", self._on_mousewheel)
+
         # ── Construir UI ──
         self._build_ui(pinned)
 
@@ -245,6 +251,16 @@ class MiniBar:
 
     # ── Acciones ───────────────────────────────────────────────────
 
+    def _on_mousewheel(self, event):
+        """Ajustar opacidad con rueda del mouse (5% por paso)."""
+        delta = 0.05 if event.delta > 0 else -0.05
+        self._set_opacity(self._opacity + delta)
+
+    def _set_opacity(self, value):
+        """Aplicar y guardar opacidad (min 15%, max 100%)."""
+        self._opacity = round(max(0.15, min(1.0, value)), 2)
+        self.root.attributes("-alpha", self._opacity)
+
     def _on_stop(self):
         self.app._stop()
 
@@ -298,4 +314,5 @@ class MiniBar:
         return {
             "mini_bar_geometry": self.root.geometry(),
             "mini_bar_pinned": self._pinned,
+            "mini_bar_opacity": self._opacity,
         }
