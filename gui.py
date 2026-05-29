@@ -549,6 +549,12 @@ class OrchestratorApp:
         """Called by the global hotkey.
         - If running: stops execution (works for any running mode).
         - If idle: starts the entire playlist."""
+        # Debounce: ignore presses within 500ms to prevent accidental double-tap
+        now = time.time()
+        last = getattr(self, "_last_hotkey", 0)
+        if now - last < 0.5:
+            return
+        self._last_hotkey = now
         def action():
             if self.is_running:
                 self._stop()
