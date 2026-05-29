@@ -467,6 +467,9 @@ class OrchestratorApp:
         ttk.Button(btn_frame, text="✏️ Editar", command=self._edit_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
+        ttk.Button(btn_frame, text="📋 Clonar", command=self._clone_script, style="Compact.TButton").pack(
+            side=tk.LEFT, padx=2
+        )
         ttk.Button(btn_frame, text="🗑️ Quitar", command=self._remove_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
@@ -833,6 +836,13 @@ class OrchestratorApp:
         win.grab_set()
         win.lift()
 
+        # Center on parent
+        win.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = win.winfo_width(), win.winfo_height()
+        win.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
@@ -893,6 +903,13 @@ class OrchestratorApp:
         win.grab_set()
         win.lift()
 
+        # Center on parent
+        win.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = win.winfo_width(), win.winfo_height()
+        win.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
@@ -941,6 +958,22 @@ class OrchestratorApp:
         idx = self.tree.index(sel[0])
         del self.playlist[idx]
         self._refresh_list()
+
+    def _clone_script(self):
+        """Duplicar el script seleccionado."""
+        sel = self.tree.selection()
+        if not sel:
+            self._dark_dialog("Seleccionar", "Seleccioná un script de la lista para clonarlo.", "info")
+            return
+        idx = self.tree.index(sel[0])
+        original = self.playlist[idx]
+        clone = dict(original)
+        self.playlist.insert(idx + 1, clone)
+        self._refresh_list()
+        # Seleccionar el clon
+        children = self.tree.get_children()
+        if idx + 1 < len(children):
+            self.tree.selection_set(children[idx + 1])
 
     def _move_up(self):
         sel = self.tree.selection()
