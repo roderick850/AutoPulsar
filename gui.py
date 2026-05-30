@@ -830,38 +830,47 @@ class OrchestratorApp:
 
         win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Agregar script")
-        win.geometry("280x260")
+        win.geometry("300x260")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
         win.lift()
+
+        # Dark titlebar
+        win.after(50, lambda: _apply_dark_titlebar(win, retries=3))
 
         # Center on parent
         win.update_idletasks()
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        win.geometry(f"300x260+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(form, text=f"Script: {os.path.basename(path)}", style="Dim.TLabel").pack(pady=(0, 10))
 
-        ttk.Label(form, text="Repeticiones:", style="Compact.TLabel").pack(anchor=tk.W)
+        row1 = ttk.Frame(form)
+        row1.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row1, text="Repeticiones:", style="Compact.TLabel").pack(side=tk.LEFT)
         reps_var = tk.IntVar(value=1)
-        ttk.Spinbox(form, from_=1, to=999, textvariable=reps_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row1, from_=1, to=999, textvariable=reps_var, width=8).pack(side=tk.RIGHT)
 
-        ttk.Label(form, text="Duración (s):", style="Compact.TLabel").pack(anchor=tk.W)
+        row2 = ttk.Frame(form)
+        row2.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row2, text="Duración (s):", style="Compact.TLabel").pack(side=tk.LEFT)
         dur_var = tk.IntVar(value=10)
-        ttk.Spinbox(form, from_=1, to=9999, textvariable=dur_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row2, from_=1, to=9999, textvariable=dur_var, width=8).pack(side=tk.RIGHT)
 
-        ttk.Label(form, text="Pausa entre reps (s):", style="Compact.TLabel").pack(anchor=tk.W)
+        row3 = ttk.Frame(form)
+        row3.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row3, text="Pausa entre reps (s):", style="Compact.TLabel").pack(side=tk.LEFT)
         pause_var = tk.IntVar(value=0)
-        ttk.Spinbox(form, from_=0, to=9999, textvariable=pause_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row3, from_=0, to=9999, textvariable=pause_var, width=8).pack(side=tk.RIGHT)
 
         time_preview = ttk.Label(form, text="Tiempo: 10s", style="Dim.TLabel")
-        time_preview.pack(anchor=tk.W, pady=(0, 8))
+        time_preview.pack(pady=(0, 8))
 
         def update_preview(*args):
             total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
@@ -897,38 +906,47 @@ class OrchestratorApp:
 
         win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Editar script")
-        win.geometry("280x280")
+        win.geometry("300x280")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
         win.lift()
+
+        # Dark titlebar
+        win.after(50, lambda: _apply_dark_titlebar(win, retries=3))
 
         # Center on parent
         win.update_idletasks()
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        win.geometry(f"300x280+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(form, text=f"Script: {os.path.basename(item['path'])}", style="Dim.TLabel").pack(pady=(0, 10))
 
-        ttk.Label(form, text="Repeticiones:", style="Compact.TLabel").pack(anchor=tk.W)
+        row1 = ttk.Frame(form)
+        row1.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row1, text="Repeticiones:", style="Compact.TLabel").pack(side=tk.LEFT)
         reps_var = tk.IntVar(value=item["repetitions"])
-        ttk.Spinbox(form, from_=1, to=999, textvariable=reps_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row1, from_=1, to=999, textvariable=reps_var, width=8).pack(side=tk.RIGHT)
 
-        ttk.Label(form, text="Duración (s):", style="Compact.TLabel").pack(anchor=tk.W)
+        row2 = ttk.Frame(form)
+        row2.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row2, text="Duración (s):", style="Compact.TLabel").pack(side=tk.LEFT)
         dur_var = tk.IntVar(value=item["duration"])
-        ttk.Spinbox(form, from_=1, to=9999, textvariable=dur_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row2, from_=1, to=9999, textvariable=dur_var, width=8).pack(side=tk.RIGHT)
 
-        ttk.Label(form, text="Pausa entre reps (s):", style="Compact.TLabel").pack(anchor=tk.W)
+        row3 = ttk.Frame(form)
+        row3.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(row3, text="Pausa entre reps (s):", style="Compact.TLabel").pack(side=tk.LEFT)
         pause_var = tk.IntVar(value=item["pause"])
-        ttk.Spinbox(form, from_=0, to=9999, textvariable=pause_var, width=8).pack(anchor=tk.W, pady=(0, 6))
+        ttk.Spinbox(row3, from_=0, to=9999, textvariable=pause_var, width=8).pack(side=tk.RIGHT)
 
         time_preview = ttk.Label(form, text=f"Tiempo: {format_time(self._calc_item_time(item))}", style="Dim.TLabel")
-        time_preview.pack(anchor=tk.W, pady=(0, 8))
+        time_preview.pack(pady=(0, 8))
 
         def update_preview(*args):
             total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
