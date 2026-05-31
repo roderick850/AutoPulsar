@@ -970,16 +970,36 @@ class OrchestratorApp:
                 "luego clic derecho en el grupo destino → Agregar scripts.", "info")
             return
 
-        # Assign group to selected scripts
-        for idx in indices:
+        # Filter: only add scripts not already in this group
+        existing = set(self._get_group_indices(group_path))
+        new_indices = [i for i in indices if i not in existing]
+        if not new_indices:
+            self._dark_dialog("Ya están",
+                "Esos scripts ya pertenecen al grupo «{}».".format(group_path), "info")
+            return
+
+        # Assign group to the new scripts
+        for idx in new_indices:
             self.playlist[idx]["group"] = group_path
 
-        # Make all group items contiguous, with newly added at the end
-        all_group = set(self._get_group_indices(group_path))
-        before = [item for i, item in enumerate(self.playlist)
-                  if i not in all_group]
-        group_items = [self.playlist[i] for i in sorted(all_group)]
-        self.playlist = before + group_items
+        # Find where the group block currently sits
+        all_group = self._get_group_indices(group_path)
+        last_group_pos = max(all_group)
+
+        # Extract the new items from their current positions (reverse order)
+        new_items = []
+        for idx in sorted(new_indices, reverse=True):
+            new_items.insert(0, self.playlist.pop(idx))
+
+        # Recalculate insertion point (may have shifted after removals)
+        all_group = self._get_group_indices(group_path)
+        insert_at = max(all_group) + 1 if all_group else last_group_pos
+
+        # Insert new items after the last existing group item
+        for item in new_items:
+            self.playlist.insert(insert_at, item)
+            insert_at += 1
+
         self._refresh_list()
 
     def _context_ungroup(self, group_path):
