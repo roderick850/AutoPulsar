@@ -430,9 +430,14 @@ class OrchestratorApp:
         list_frame = ttk.Frame(self.root)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
+        # Container to constrain treeview + scrollbar
+        tree_container = ttk.Frame(list_frame)
+        tree_container.pack(fill=tk.BOTH, expand=True)
+
         columns = ("orden", "hab", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
-            list_frame, columns=columns, show="tree headings", selectmode="extended"
+            tree_container, columns=columns, show="tree headings", selectmode="extended",
+            height=30,
         )
         # Column #0 = tree column (expander arrows for groups)
         self.tree.column("#0", width=30, minwidth=24, stretch=False, anchor="w")
@@ -465,11 +470,17 @@ class OrchestratorApp:
         self.tree.bind("<<TreeviewClose>>", self._on_group_expand_collapse)
         self._inline_entry = None
 
-        vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
+        vsb = ttk.Scrollbar(tree_container, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
 
+        # Ensure treeview respects its container height (don't expand to show all rows)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Mousewheel scrolling
+        def _on_mousewheel(event):
+            self.tree.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self.tree.bind("<MouseWheel>", _on_mousewheel)
 
         # ===== Frame botones (compacto) =====
         btn_frame = ttk.Frame(self.root)
@@ -775,6 +786,9 @@ class OrchestratorApp:
             if typ == "group" and not self.tree.item(iid, "open"):
                 collapsed.append(data)
         self.settings["collapsed_groups"] = collapsed
+
+        # Force scrollbar to update (sometimes gets stale after full rebuild)
+        self.tree.update_idletasks()
 
     def _on_tree_click(self, event):
         """Toggle enabled/disabled when clicking the checkbox column."""
