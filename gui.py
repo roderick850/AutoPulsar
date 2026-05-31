@@ -430,7 +430,7 @@ class OrchestratorApp:
         list_frame = ttk.Frame(self.root)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
-        columns = ("orden", "hab", "nombre", "reps", "duracion", "pausa", "tiempo")
+        columns = ("orden", "hab", "primero", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
             list_frame, columns=columns, show="tree headings", selectmode="extended",
         )
@@ -440,6 +440,7 @@ class OrchestratorApp:
 
         self.tree.heading("orden", text="#")
         self.tree.heading("hab", text="✓")
+        self.tree.heading("primero", text="1°")
         self.tree.heading("nombre", text="Script")
         self.tree.heading("reps", text="Reps")
         self.tree.heading("duracion", text="Dur (s)")
@@ -448,7 +449,8 @@ class OrchestratorApp:
 
         self.tree.column("orden", width=28, anchor="center")
         self.tree.column("hab", width=26, anchor="center")
-        self.tree.column("nombre", width=210, anchor="w")
+        self.tree.column("primero", width=28, anchor="center")
+        self.tree.column("nombre", width=190, anchor="w")
         self.tree.column("reps", width=50, anchor="center")
         self.tree.column("duracion", width=55, anchor="center")
         self.tree.column("pausa", width=55, anchor="center")
@@ -665,7 +667,12 @@ class OrchestratorApp:
             delay = self._parse_int(self.loop_delay_var, 0)
         if mode == "infinite":
             return None  # Infinite
-        total = loop_time * count + delay * max(count - 1, 0)
+        # first_loop_only items count only once regardless of loop count
+        once_time = sum(self._calc_item_time(item) for item in target
+                        if item.get("first_loop_only", False))
+        repeat_time = sum(self._calc_item_time(item) for item in target
+                          if not item.get("first_loop_only", False))
+        total = once_time + repeat_time * count + delay * max(count - 1, 0)
         return total
 
     def _update_time_labels(self):
@@ -730,6 +737,7 @@ class OrchestratorApp:
             item_time = self._calc_item_time(item)
             enabled = item.get("enabled", True)
             check = "✅" if enabled else "❌"
+            primero = "🔂" if item.get("first_loop_only", False) else ""
 
             if group:
                 parts = group.split("/")
@@ -742,7 +750,7 @@ class OrchestratorApp:
                         group_iid = self.tree.insert(
                             parent_iid, tk.END,
                             text=" ",  # columna árbol necesita contenido para jerarquía
-                            values=("", "", f"📁 {part}", "", "", "", ""),
+                            values=("", "", "", f"📁 {part}", "", "", "", ""),
                             tags=("group_row",),
                             open=old_open_state.get(current_path, True),
                         )
@@ -756,7 +764,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
-                    values=(idx + 1, check, f"{indent}{os.path.basename(item['path'])}",
+                    values=(idx + 1, check, primero, f"{indent}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_grouped",),
@@ -766,7 +774,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     "", tk.END,
                     text=" ",
-                    values=(idx + 1, check, os.path.basename(item["path"]),
+                    values=(idx + 1, check, primero, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_ungrouped",),
@@ -786,13 +794,12 @@ class OrchestratorApp:
         self.tree.update_idletasks()
 
     def _on_tree_click(self, event):
-        """Toggle enabled/disabled when clicking the checkbox column."""
+        """Toggle enabled/disabled or first_loop_only when clicking their columns."""
         region = self.tree.identify_region(event.x, event.y)
         column = self.tree.identify_column(event.x)
         item_id = self.tree.identify_row(event.y)
 
-        # Only act on the checkbox column (#2 = "hab")
-        if region != "cell" or column != "#2" or not item_id:
+        if region != "cell" or not item_id:
             return
 
         info = self._item_map.get(item_id)
@@ -800,9 +807,15 @@ class OrchestratorApp:
             return  # Don't toggle groups
 
         idx = info[1]
-        current = self.playlist[idx].get("enabled", True)
-        self.playlist[idx]["enabled"] = not current
-        self._refresh_list()
+
+        if column == "#2":  # hab (enabled/disabled)
+            current = self.playlist[idx].get("enabled", True)
+            self.playlist[idx]["enabled"] = not current
+            self._refresh_list()
+        elif column == "#3":  # primero (first_loop_only)
+            current = self.playlist[idx].get("first_loop_only", False)
+            self.playlist[idx]["first_loop_only"] = not current
+            self._refresh_list()
 
     def _on_group_expand_collapse(self, event):
         """Real-time sync of collapsed state when user clicks expand/collapse arrows."""
@@ -1138,6 +1151,7 @@ class OrchestratorApp:
                     "duration": dur_var.get(),
                     "pause": pause_var.get(),
                     "enabled": True,
+                    "first_loop_only": False,
                     "group": None,
                 }
             )

@@ -31,11 +31,16 @@ class Executor(threading.Thread):
 
         total_reps_per_loop = sum(item["repetitions"] for item in self.playlist)
 
+        # first_loop_only items only count once overall
+        once_reps = sum(item["repetitions"] for item in self.playlist
+                        if item.get("first_loop_only", False))
+        repeat_reps = total_reps_per_loop - once_reps
+
         # Total global real (None si es infinito)
         if max_loops is None:
             total_global_reps = None
         else:
-            total_global_reps = total_reps_per_loop * max_loops
+            total_global_reps = once_reps + repeat_reps * max_loops
 
         current_loop = 0
         completed_reps_total = 0
@@ -59,6 +64,10 @@ class Executor(threading.Thread):
             for idx, item in enumerate(self.playlist):
                 if self.stop_event.is_set():
                     break
+
+                # Skip first_loop_only items after the first loop
+                if current_loop > 1 and item.get("first_loop_only", False):
+                    continue
 
                 name = os.path.basename(item["path"])
                 reps = item["repetitions"]
