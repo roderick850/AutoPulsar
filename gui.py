@@ -685,12 +685,12 @@ class OrchestratorApp:
         # Tag styles for visual differentiation
         self.tree.tag_configure("group_row",
             font=("Segoe UI", 9, "bold"),
-            background=DARK_COLORS["surface_alt"],
-            foreground=DARK_COLORS["text"],
+            background="#1a3048",  # azul más intenso para headers de grupo
+            foreground="#cdd6f4",
         )
         self.tree.tag_configure("script_grouped",
             font=("Segoe UI", 9),
-            background="#252540",  # subtle tint — distinto al fondo base
+            background="#1e2a3a",  # azul oscuro — contraste claro con surface
             foreground=DARK_COLORS["text"],
         )
         self.tree.tag_configure("script_ungrouped",
