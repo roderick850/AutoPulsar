@@ -1224,6 +1224,7 @@ class OrchestratorApp:
                         self.playlist[idx],
                     )
                     self._refresh_list()
+                    self._reselect_script(idx - 1)
 
     def _move_down(self):
         sel = self.tree.selection()
@@ -1249,6 +1250,7 @@ class OrchestratorApp:
                         self.playlist[idx],
                     )
                     self._refresh_list()
+                    self._reselect_script(idx + 1)
 
     # ═══════════════════════════════════════════════════════════════
     # GROUP / BLOCK MOVEMENT
@@ -1290,9 +1292,32 @@ class OrchestratorApp:
         """Find the index of the top-level block for a group (first segment)."""
         top = group_name.split("/")[0]
         for bi, block in enumerate(blocks):
-            if len(block) > 1 and block[0].get("group", "").startswith(top):
+            first_group = block[0].get("group", "")
+            if first_group and first_group.startswith(top):
                 return bi
         return -1
+
+    def _reselect_group(self, group_path):
+        """After _refresh_list, find and re-select the group header."""
+        def _scan(parent):
+            for iid in self.tree.get_children(parent):
+                info = self._item_map.get(iid)
+                if info and info[0] == "group" and info[1] == group_path:
+                    self.tree.selection_set(iid)
+                    self.tree.see(iid)
+                    return True
+                if _scan(iid):
+                    return True
+            return False
+        _scan("")
+
+    def _reselect_script(self, playlist_idx):
+        """After _refresh_list, find and re-select a script by playlist index."""
+        for iid, (typ, data) in self._item_map.items():
+            if typ == "script" and data == playlist_idx:
+                self.tree.selection_set(iid)
+                self.tree.see(iid)
+                return
 
     def _get_subgroup_range(self, group_path):
         """Return (start, end+1) indices in playlist for items in this group/subgroup.
@@ -1324,6 +1349,7 @@ class OrchestratorApp:
             self.playlist = (self.playlist[:above_start] + block + above_block +
                              self.playlist[end:])
             self._refresh_list()
+            self._reselect_group(group_path)
             return
 
         # Fall back to top-level block movement
@@ -1334,6 +1360,7 @@ class OrchestratorApp:
         blocks[bi], blocks[bi - 1] = blocks[bi - 1], blocks[bi]
         self.playlist = self._blocks_to_playlist(blocks)
         self._refresh_list()
+        self._reselect_group(group_path)
 
     def _move_block_down(self, group_path):
         """Move a group block down. Handles both top-level groups and sub-groups."""
@@ -1353,6 +1380,7 @@ class OrchestratorApp:
             self.playlist = (self.playlist[:start] + below_block + block +
                              self.playlist[below_end:])
             self._refresh_list()
+            self._reselect_group(group_path)
             return
 
         # Fall back to top-level block movement
@@ -1363,6 +1391,7 @@ class OrchestratorApp:
         blocks[bi], blocks[bi + 1] = blocks[bi + 1], blocks[bi]
         self.playlist = self._blocks_to_playlist(blocks)
         self._refresh_list()
+        self._reselect_group(group_path)
 
     # ═══════════════════════════════════════════════════════════════
     # GROUP OPERATIONS
