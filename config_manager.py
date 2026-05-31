@@ -15,6 +15,8 @@ DEFAULT_SETTINGS = {
     "mini_bar_geometry": "450x36",
     "mini_bar_pinned": True,
     "menu_bar_visible": True,
+    # ── Group collapse state ──
+    "collapsed_groups": [],
 }
 
 

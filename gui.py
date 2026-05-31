@@ -686,6 +686,12 @@ class OrchestratorApp:
             if typ == "group":
                 old_open_state[data] = self.tree.item(iid, "open")
 
+        # ── First load: restore from persisted settings ──
+        if not old_open_state:
+            persisted = self.settings.get("collapsed_groups", [])
+            for path in persisted:
+                old_open_state[path] = False
+
         for i in self.tree.get_children():
             self.tree.delete(i)
         self._item_map.clear()
@@ -759,6 +765,13 @@ class OrchestratorApp:
             self._item_map[script_iid] = ("script", idx)
 
         self._update_time_labels()
+
+        # ── Persist collapsed group state ──
+        collapsed = []
+        for iid, (typ, data) in self._item_map.items():
+            if typ == "group" and not self.tree.item(iid, "open"):
+                collapsed.append(data)
+        self.settings["collapsed_groups"] = collapsed
 
     def _on_tree_click(self, event):
         """Toggle enabled/disabled when clicking the checkbox column."""
@@ -1190,11 +1203,15 @@ class OrchestratorApp:
         elif item_type == "script":
             idx = ref
             if idx > 0:
-                self.playlist[idx], self.playlist[idx - 1] = (
-                    self.playlist[idx - 1],
-                    self.playlist[idx],
-                )
-                self._refresh_list()
+                # Only move within the same group (or both ungrouped)
+                cur_group = self.playlist[idx].get("group", None)
+                prev_group = self.playlist[idx - 1].get("group", None)
+                if cur_group == prev_group:
+                    self.playlist[idx], self.playlist[idx - 1] = (
+                        self.playlist[idx - 1],
+                        self.playlist[idx],
+                    )
+                    self._refresh_list()
 
     def _move_down(self):
         sel = self.tree.selection()
@@ -1211,11 +1228,15 @@ class OrchestratorApp:
         elif item_type == "script":
             idx = ref
             if idx < len(self.playlist) - 1:
-                self.playlist[idx], self.playlist[idx + 1] = (
-                    self.playlist[idx + 1],
-                    self.playlist[idx],
-                )
-                self._refresh_list()
+                # Only move within the same group (or both ungrouped)
+                cur_group = self.playlist[idx].get("group", None)
+                nxt_group = self.playlist[idx + 1].get("group", None)
+                if cur_group == nxt_group:
+                    self.playlist[idx], self.playlist[idx + 1] = (
+                        self.playlist[idx + 1],
+                        self.playlist[idx],
+                    )
+                    self._refresh_list()
 
     # ═══════════════════════════════════════════════════════════════
     # GROUP / BLOCK MOVEMENT
@@ -1261,20 +1282,70 @@ class OrchestratorApp:
                 return bi
         return -1
 
-    def _move_block_up(self, group_name):
-        """Move a top-level group block up."""
+    def _get_subgroup_range(self, group_path):
+        """Return (start, end+1) indices in playlist for items in this group/subgroup.
+        Returns None if group not found or items are scattered."""
+        indices = [i for i, item in enumerate(self.playlist)
+                   if item.get("group") == group_path or
+                   (item.get("group") and item["group"].startswith(group_path + "/"))]
+        if not indices:
+            return None
+        # Verify contiguity
+        if indices != list(range(indices[0], indices[-1] + 1)):
+            return None
+        return (indices[0], indices[-1] + 1)
+
+    def _move_block_up(self, group_path):
+        """Move a group block up. Handles both top-level groups and sub-groups."""
+        # Try sub-group range first
+        rng = self._get_subgroup_range(group_path)
+        if rng and rng[0] > 0:
+            start, end = rng
+            # Find the full block above (could be multi-item if it's another sub-group)
+            prev_item = self.playlist[start - 1]
+            prev_group = prev_item.get("group")
+            above_start = start - 1
+            while above_start > 0 and self.playlist[above_start - 1].get("group") == prev_group:
+                above_start -= 1
+            above_block = self.playlist[above_start:start]
+            block = self.playlist[start:end]
+            self.playlist = (self.playlist[:above_start] + block + above_block +
+                             self.playlist[end:])
+            self._refresh_list()
+            return
+
+        # Fall back to top-level block movement
         blocks = self._to_blocks()
-        bi = self._find_block_index(blocks, group_name)
+        bi = self._find_block_index(blocks, group_path)
         if bi <= 0:
             return
         blocks[bi], blocks[bi - 1] = blocks[bi - 1], blocks[bi]
         self.playlist = self._blocks_to_playlist(blocks)
         self._refresh_list()
 
-    def _move_block_down(self, group_name):
-        """Move a top-level group block down."""
+    def _move_block_down(self, group_path):
+        """Move a group block down. Handles both top-level groups and sub-groups."""
+        # Try sub-group range first
+        rng = self._get_subgroup_range(group_path)
+        if rng and rng[1] < len(self.playlist):
+            start, end = rng
+            # Find the full block below (could be multi-item if it's another sub-group)
+            nxt_item = self.playlist[end]
+            nxt_group = nxt_item.get("group")
+            below_end = end + 1
+            while (below_end < len(self.playlist) and
+                   self.playlist[below_end].get("group") == nxt_group):
+                below_end += 1
+            below_block = self.playlist[end:below_end]
+            block = self.playlist[start:end]
+            self.playlist = (self.playlist[:start] + below_block + block +
+                             self.playlist[below_end:])
+            self._refresh_list()
+            return
+
+        # Fall back to top-level block movement
         blocks = self._to_blocks()
-        bi = self._find_block_index(blocks, group_name)
+        bi = self._find_block_index(blocks, group_path)
         if bi < 0 or bi >= len(blocks) - 1:
             return
         blocks[bi], blocks[bi + 1] = blocks[bi + 1], blocks[bi]
@@ -1459,6 +1530,8 @@ class OrchestratorApp:
             "hotkey": self.hotkey_var.get().lower(),
             "window_geometry": self.root.geometry(),
             "mini_bar_enabled": self._mini_bar_enabled,
+            # ── Carry over persisted state ──
+            "collapsed_groups": self.settings.get("collapsed_groups", []),
         }
         if self.mini_bar is not None:
             mb = self.mini_bar.get_settings()
