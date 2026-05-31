@@ -458,6 +458,8 @@ class OrchestratorApp:
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
         # Double-click on editable columns for inline editing
         self.tree.bind("<Double-1>", self._on_tree_double_click)
+        # Right-click context menu
+        self.tree.bind("<Button-3>", self._on_tree_right_click)
         self._inline_entry = None
 
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
@@ -858,6 +860,78 @@ class OrchestratorApp:
             except tk.TclError:
                 pass
             self._inline_entry = None
+
+    # ═══════════════════════════════════════════════════════════════
+    # RIGHT-CLICK CONTEXT MENU
+    # ═══════════════════════════════════════════════════════════════
+
+    def _on_tree_right_click(self, event):
+        """Show context menu on right-click. Does NOT modify selection."""
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        info = self._item_map.get(item_id)
+        if info is None:
+            return
+
+        menu = tk.Menu(self.root, tearoff=0,
+                       bg=DARK_COLORS["menu_bg"], fg=DARK_COLORS["menu_fg"],
+                       activebackground=DARK_COLORS["menu_active"],
+                       activeforeground="#ffffff",
+                       font=("Segoe UI", 9))
+
+        if info[0] == "group":
+            group_path = info[1]
+            menu.add_command(label="📁 Crear subgrupo aquí",
+                           command=lambda: self._context_create_subgroup(group_path))
+            menu.add_command(label="🏷️ Renombrar",
+                           command=lambda: self._rename_group_dialog(group_path))
+            menu.add_separator()
+            menu.add_command(label="✂️ Desagrupar todo",
+                           command=lambda: self._context_ungroup(group_path))
+            menu.add_command(label="🗑️ Eliminar grupo",
+                           command=lambda: self._context_remove_group(group_path))
+
+        elif info[0] == "script":
+            menu.add_command(label="📁 Agrupar seleccionados",
+                           command=self._group_selected)
+            menu.add_command(label="✂️ Desagrupar",
+                           command=self._ungroup_selected)
+
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _context_create_subgroup(self, parent_path):
+        """Create a subgroup under parent_path using currently selected scripts."""
+        sel = self.tree.selection()
+        indices = []
+        for iid in sel:
+            info = self._item_map.get(iid)
+            if info and info[0] == "script":
+                indices.append(info[1])
+
+        if not indices:
+            self._dark_dialog("Subgrupo",
+                "Seleccioná los scripts que querés mover al subgrupo,\n"
+                "luego clic derecho en el grupo destino → Crear subgrupo.", "info")
+            return
+
+        label = f"Crear subgrupo dentro de «{parent_path}»\nNombre:"
+        self._ask_group_name(lambda name: self._do_group(indices, name, parent_path),
+                           label=label)
+
+    def _context_ungroup(self, group_path):
+        """Ungroup all items in a group (via right-click menu)."""
+        for idx in self._get_group_indices(group_path):
+            self.playlist[idx]["group"] = None
+        self._refresh_list()
+
+    def _context_remove_group(self, group_path):
+        """Remove all items in a group (via right-click menu)."""
+        indices = self._get_group_indices(group_path)
+        for i in sorted(indices, reverse=True):
+            del self.playlist[i]
+        self._refresh_list()
 
     # ═══════════════════════════════════════════════════════════════
     # DIALOGS
