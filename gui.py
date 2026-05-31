@@ -718,7 +718,7 @@ class OrchestratorApp:
                     if current_path not in group_nodes:
                         group_iid = self.tree.insert(
                             parent_iid, tk.END,
-                            text="",
+                            text=" ",  # columna árbol necesita contenido para jerarquía
                             values=("", "", f"📁 {part}", "", "", "", ""),
                             tags=("group_row",),
                             open=True,
@@ -730,7 +730,7 @@ class OrchestratorApp:
                 # Script inside a group — tinted background
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
-                    text="",
+                    text=" ",
                     values=(idx + 1, check, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
@@ -740,7 +740,7 @@ class OrchestratorApp:
                 # Ungrouped — default surface background
                 script_iid = self.tree.insert(
                     "", tk.END,
-                    text="",
+                    text=" ",
                     values=(idx + 1, check, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
