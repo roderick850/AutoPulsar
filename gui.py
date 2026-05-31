@@ -432,8 +432,12 @@ class OrchestratorApp:
 
         columns = ("orden", "hab", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
-            list_frame, columns=columns, show="headings", selectmode="extended"
+            list_frame, columns=columns, show="tree headings", selectmode="extended"
         )
+        # Column #0 = tree column (expander arrows for groups)
+        self.tree.column("#0", width=22, minwidth=22, stretch=False, anchor="w")
+        self.tree.heading("#0", text="")
+
         self.tree.heading("orden", text="#")
         self.tree.heading("hab", text="✓")
         self.tree.heading("nombre", text="Script")
@@ -444,16 +448,18 @@ class OrchestratorApp:
 
         self.tree.column("orden", width=28, anchor="center")
         self.tree.column("hab", width=26, anchor="center")
-        self.tree.column("nombre", width=200, anchor="w")
-        self.tree.column("reps", width=55, anchor="center")
-        self.tree.column("duracion", width=60, anchor="center")
-        self.tree.column("pausa", width=60, anchor="center")
-        self.tree.column("tiempo", width=75, anchor="center")
+        self.tree.column("nombre", width=210, anchor="w")
+        self.tree.column("reps", width=50, anchor="center")
+        self.tree.column("duracion", width=55, anchor="center")
+        self.tree.column("pausa", width=55, anchor="center")
+        self.tree.column("tiempo", width=70, anchor="center")
 
         # Click on checkbox column toggles enabled/disabled
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
         # Double-click on editable columns for inline editing
         self.tree.bind("<Double-1>", self._on_tree_double_click)
+        # Click on tree column (#0) toggles expand/collapse manually
+        self.tree.bind("<Button-1>", self._on_tree_single_click, add="+")
         self._inline_entry = None
 
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
@@ -673,11 +679,11 @@ class OrchestratorApp:
     # ═══════════════════════════════════════════════════════════════
 
     def _refresh_list(self):
+        """Rebuild treeview from flat playlist using group paths for hierarchy."""
         for i in self.tree.get_children():
             self.tree.delete(i)
         self._item_map.clear()
 
-        # Configure group row tag
         self.tree.tag_configure("group_row",
             font=("Segoe UI", 9, "bold"),
             background=DARK_COLORS["surface_alt"],
@@ -689,40 +695,55 @@ class OrchestratorApp:
             foreground=DARK_COLORS["text"],
         )
 
-        current_group = None
+        # group_nodes: {group_path: treeview_iid}
+        group_nodes = {}
+
         for idx, item in enumerate(self.playlist):
             group = item.get("group", None)
             item_time = self._calc_item_time(item)
             enabled = item.get("enabled", True)
             check = "✅" if enabled else "❌"
 
-            # Insert group header when entering a new group
-            if group is not None and group != current_group:
-                group_iid = self.tree.insert(
-                    "", tk.END,
-                    values=("", "", f"📁 {group}", "", "", "", ""),
-                    tags=("group_row",),
-                )
-                self._item_map[group_iid] = ("group", group)
-                current_group = group
-            elif group is None:
-                current_group = None
+            if group:
+                parts = group.split("/")
+                parent_iid = ""
+                current_path = ""
 
-            # Insert script row
-            script_iid = self.tree.insert(
-                "", tk.END,
-                values=(
-                    idx + 1,
-                    check,
-                    f"    {os.path.basename(item['path'])}",
-                    item["repetitions"],
-                    item["duration"],
-                    item["pause"],
-                    format_time(item_time),
-                ),
-                tags=("script_row",),
-            )
+                for part in parts:
+                    current_path = f"{current_path}/{part}" if current_path else part
+                    if current_path not in group_nodes:
+                        group_iid = self.tree.insert(
+                            parent_iid, tk.END,
+                            text="",
+                            values=("", "", f"📁 {part}", "", "", "", ""),
+                            tags=("group_row",),
+                            open=True,
+                        )
+                        group_nodes[current_path] = group_iid
+                        self._item_map[group_iid] = ("group", current_path)
+                    parent_iid = group_nodes[current_path]
+
+                # Insert script under deepest group
+                script_iid = self.tree.insert(
+                    parent_iid, tk.END,
+                    text="",
+                    values=(idx + 1, check, os.path.basename(item["path"]),
+                            item["repetitions"], item["duration"],
+                            item["pause"], format_time(item_time)),
+                    tags=("script_row",),
+                )
+            else:
+                # Ungrouped — insert at root
+                script_iid = self.tree.insert(
+                    "", tk.END,
+                    text="",
+                    values=(idx + 1, check, os.path.basename(item["path"]),
+                            item["repetitions"], item["duration"],
+                            item["pause"], format_time(item_time)),
+                    tags=("script_row",),
+                )
             self._item_map[script_iid] = ("script", idx)
+
         self._update_time_labels()
 
     def _on_tree_click(self, event):
@@ -743,6 +764,23 @@ class OrchestratorApp:
         current = self.playlist[idx].get("enabled", True)
         self.playlist[idx]["enabled"] = not current
         self._refresh_list()
+
+    def _on_tree_single_click(self, event):
+        """Handle click on tree column (#0) for manual expand/collapse of groups."""
+        column = self.tree.identify_column(event.x)
+        item_id = self.tree.identify_row(event.y)
+
+        if column != "#0" or not item_id:
+            return
+
+        info = self._item_map.get(item_id)
+        if info is None or info[0] != "group":
+            return
+
+        # Toggle open/closed (treeview already handles this natively,
+        # but this ensures it works even if the expander arrow is missed)
+        current = self.tree.item(item_id, "open")
+        self.tree.item(item_id, open=not current)
 
     def _on_tree_double_click(self, event):
         """Inline editing: double-click on reps/duration/pause cell to edit directly.
@@ -1115,20 +1153,22 @@ class OrchestratorApp:
     # ═══════════════════════════════════════════════════════════════
 
     def _get_group_indices(self, group_name):
-        """Return sorted list of playlist indices for items in a group."""
+        """Return playlist indices for items in a group, including nested children."""
         return [i for i, item in enumerate(self.playlist)
-                if item.get("group") == group_name]
+                if item.get("group") and
+                (item["group"] == group_name or item["group"].startswith(group_name + "/"))]
 
     def _to_blocks(self):
-        """Convert playlist to blocks. Each block is [item, ...] (ungrouped=1-item block)."""
+        """Convert playlist to top-level blocks (grouped by first segment of group path)."""
         blocks = []
         i = 0
         while i < len(self.playlist):
             item = self.playlist[i]
             group = item.get("group", None)
-            if group is not None:
+            if group:
+                top_group = group.split("/")[0]
                 block = []
-                while i < len(self.playlist) and self.playlist[i].get("group") == group:
+                while i < len(self.playlist) and self.playlist[i].get("group", "").startswith(top_group):
                     block.append(self.playlist[i])
                     i += 1
                 blocks.append(block)
@@ -1145,14 +1185,15 @@ class OrchestratorApp:
         return result
 
     def _find_block_index(self, blocks, group_name):
-        """Find the index of the block with the given group name."""
+        """Find the index of the top-level block for a group (first segment)."""
+        top = group_name.split("/")[0]
         for bi, block in enumerate(blocks):
-            if len(block) > 1 and block[0].get("group") == group_name:
+            if len(block) > 1 and block[0].get("group", "").startswith(top):
                 return bi
         return -1
 
     def _move_block_up(self, group_name):
-        """Move an entire group block up by one position."""
+        """Move a top-level group block up."""
         blocks = self._to_blocks()
         bi = self._find_block_index(blocks, group_name)
         if bi <= 0:
@@ -1162,7 +1203,7 @@ class OrchestratorApp:
         self._refresh_list()
 
     def _move_block_down(self, group_name):
-        """Move an entire group block down by one position."""
+        """Move a top-level group block down."""
         blocks = self._to_blocks()
         bi = self._find_block_index(blocks, group_name)
         if bi < 0 or bi >= len(blocks) - 1:
@@ -1176,43 +1217,48 @@ class OrchestratorApp:
     # ═══════════════════════════════════════════════════════════════
 
     def _group_selected(self):
-        """Assign the selected script(s) to a new or existing group."""
+        """Assign selected script(s) to a group. If a group header is also selected,
+        the new group nests inside it. Supports multi-select for batch grouping."""
         sel = self.tree.selection()
         if not sel:
-            self._dark_dialog("Seleccionar", "Seleccioná uno o más scripts para agrupar.", "info")
+            self._dark_dialog("Seleccionar", "Seleccioná scripts para agrupar.", "info")
             return
 
-        # Collect unique script indices from selection
+        # Separate group headers and scripts from selection
+        parent_path = None  # If a group header is selected, nest inside it
         indices = []
         for iid in sel:
             info = self._item_map.get(iid)
-            if info and info[0] == "script":
+            if info is None:
+                continue
+            if info[0] == "group":
+                parent_path = info[1] if parent_path is None else parent_path
+            elif info[0] == "script":
                 indices.append(info[1])
 
         if not indices:
-            self._dark_dialog("Grupo", "Seleccioná scripts (no headers de grupo).", "info")
+            self._dark_dialog("Grupo", "Seleccioná al menos un script.", "info")
             return
 
-        # Ask for group name
-        self._ask_group_name(lambda name: self._do_group(indices, name))
+        self._ask_group_name(lambda name: self._do_group(indices, name, parent_path))
 
-    def _do_group(self, indices, group_name):
-        """Assign the given playlist indices to `group_name` and sort them together."""
+    def _do_group(self, indices, group_name, parent_path=None):
+        """Assign the given indices to `group_name`, optionally nested under parent_path."""
         if not group_name.strip():
             return
         group_name = group_name.strip()
 
-        # Assign group to all selected items
-        for idx in indices:
-            self.playlist[idx]["group"] = group_name
+        # Build full group path
+        full_path = f"{parent_path}/{group_name}" if parent_path else group_name
 
-        # Move all group items to be contiguous starting at the first selected index
+        for idx in indices:
+            self.playlist[idx]["group"] = full_path
+
+        # Move group items to be contiguous at the first selected index
         group_items = [self.playlist[i] for i in indices]
-        all_group_indices = self._get_group_indices(group_name)
-        # Remove all existing items of this group
-        for i in sorted(all_group_indices, reverse=True):
+        all_indices = self._get_group_indices(full_path)
+        for i in sorted(all_indices, reverse=True):
             del self.playlist[i]
-        # Insert all group items at the position of the first selected
         insert_at = min(indices)
         for item in reversed(group_items):
             self.playlist.insert(insert_at, item)
@@ -1220,25 +1266,21 @@ class OrchestratorApp:
         self._refresh_list()
 
     def _ungroup_selected(self):
-        """Remove group assignment from selected scripts."""
+        """Remove group assignment from selected scripts or entire group."""
         sel = self.tree.selection()
         if not sel:
             return
 
-        indices = []
-        group_to_clear = None
+        indices = set()
         for iid in sel:
             info = self._item_map.get(iid)
             if info is None:
                 continue
             if info[0] == "group":
-                group_to_clear = info[1]
+                for i in self._get_group_indices(info[1]):
+                    indices.add(i)
             elif info[0] == "script":
-                indices.append(info[1])
-
-        # If a group header was selected, ungroup all items in that group
-        if group_to_clear:
-            indices = self._get_group_indices(group_to_clear)
+                indices.add(info[1])
 
         for idx in indices:
             self.playlist[idx]["group"] = None
@@ -1254,21 +1296,35 @@ class OrchestratorApp:
         if info is None or info[0] != "group":
             self._dark_dialog("Grupo", "Seleccioná un header de grupo para renombrar.", "info")
             return
-
         self._rename_group_dialog(info[1])
 
-    def _rename_group_dialog(self, old_name):
+    def _rename_group_dialog(self, old_path):
         """Show dialog to rename a group."""
-        group_indices = self._get_group_indices(old_name)
-        self._ask_group_name(lambda new_name: self._do_rename_group(old_name, new_name))
+        # Pre-fill with last segment (the group's own name)
+        last_part = old_path.rsplit("/", 1)[-1]
+        self._ask_group_name(lambda new_name: self._do_rename_group(old_path, new_name))
 
-    def _do_rename_group(self, old_name, new_name):
-        """Rename all items from old_name to new_name."""
-        if not new_name.strip() or new_name.strip() == old_name:
+    def _do_rename_group(self, old_path, new_name):
+        """Rename a group: change the last segment of the path for all matching items."""
+        if not new_name.strip():
             return
         new_name = new_name.strip()
-        for idx in self._get_group_indices(old_name):
-            self.playlist[idx]["group"] = new_name
+
+        # Replace old_path with new path (keeping parent intact)
+        parent = old_path.rsplit("/", 1)[0] if "/" in old_path else ""
+        new_path = f"{parent}/{new_name}" if parent else new_name
+
+        if new_path == old_path:
+            return
+
+        for idx in self._get_group_indices(old_path):
+            old_group = self.playlist[idx]["group"]
+            # Replace only the matching prefix
+            if old_group == old_path:
+                self.playlist[idx]["group"] = new_path
+            elif old_group.startswith(old_path + "/"):
+                self.playlist[idx]["group"] = new_path + old_group[len(old_path):]
+
         self._refresh_list()
 
     def _ask_group_name(self, callback):
