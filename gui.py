@@ -240,7 +240,7 @@ class OrchestratorApp:
     def _menu_about(self):
         """Mostrar diálogo Acerca de."""
         msg = (
-            "TinyTask Orchestrator v1.0.2\n\n"
+            "TinyTask Orchestrator v1.0.3\n\n"
             "Automatización de tareas con ejecución\n"
             "por tiempos fijos, loops y hotkeys globales.\n\n"
             "Modo Mini Bar para gaming en monitor único.\n\n"
