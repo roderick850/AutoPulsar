@@ -460,6 +460,9 @@ class OrchestratorApp:
         self.tree.bind("<Double-1>", self._on_tree_double_click)
         # Right-click context menu
         self.tree.bind("<Button-3>", self._on_tree_right_click)
+        # Track collapse/expand in real time so persisted state is always accurate
+        self.tree.bind("<<TreeviewOpen>>", self._on_group_expand_collapse)
+        self.tree.bind("<<TreeviewClose>>", self._on_group_expand_collapse)
         self._inline_entry = None
 
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
@@ -791,6 +794,15 @@ class OrchestratorApp:
         current = self.playlist[idx].get("enabled", True)
         self.playlist[idx]["enabled"] = not current
         self._refresh_list()
+
+    def _on_group_expand_collapse(self, event):
+        """Real-time sync of collapsed state when user clicks expand/collapse arrows."""
+        # Update saved collapsed list immediately from current tree state
+        collapsed = []
+        for iid, (typ, data) in self._item_map.items():
+            if typ == "group" and not self.tree.item(iid, "open"):
+                collapsed.append(data)
+        self.settings["collapsed_groups"] = collapsed
 
     def _on_tree_double_click(self, event):
         """Inline editing: double-click on reps/duration/pause cell to edit directly.
