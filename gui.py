@@ -1241,15 +1241,18 @@ class OrchestratorApp:
         for idx in indices:
             self.playlist[idx]["group"] = full_path
 
-        # Move group items to be contiguous at the first selected index
-        group_items = [self.playlist[i] for i in indices]
-        all_indices = self._get_group_indices(full_path)
-        for i in sorted(all_indices, reverse=True):
-            del self.playlist[i]
-        insert_at = min(indices)
-        for item in reversed(group_items):
-            self.playlist.insert(insert_at, item)
+        # Get ALL items with this group (including existing ones)
+        all_group = set(self._get_group_indices(full_path))
+        first_selected = min(indices)
 
+        # Rebuild playlist: group items contiguous at first selected position
+        before = [item for i, item in enumerate(self.playlist)
+                  if i not in all_group and i < first_selected]
+        group_items = [self.playlist[i] for i in sorted(all_group)]
+        after = [item for i, item in enumerate(self.playlist)
+                 if i not in all_group and i >= first_selected]
+
+        self.playlist = before + group_items + after
         self._refresh_list()
 
     def _ungroup_selected(self):
