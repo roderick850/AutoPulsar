@@ -918,6 +918,8 @@ class OrchestratorApp:
             group_path = info[1]
             menu.add_command(label="📁 Crear subgrupo aquí",
                            command=lambda: self._context_create_subgroup(group_path))
+            menu.add_command(label="➕ Agregar scripts al grupo",
+                           command=lambda: self._context_add_to_group(group_path))
             menu.add_command(label="🏷️ Renombrar",
                            command=lambda: self._rename_group_dialog(group_path))
             menu.add_separator()
@@ -952,6 +954,33 @@ class OrchestratorApp:
         label = f"Crear subgrupo dentro de «{parent_path}»\nNombre:"
         self._ask_group_name(lambda name: self._do_group(indices, name, parent_path),
                            label=label)
+
+    def _context_add_to_group(self, group_path):
+        """Add currently selected scripts to an existing group (right-click menu)."""
+        sel = self.tree.selection()
+        indices = []
+        for iid in sel:
+            info = self._item_map.get(iid)
+            if info and info[0] == "script":
+                indices.append(info[1])
+
+        if not indices:
+            self._dark_dialog("Agregar a grupo",
+                "Seleccioná los scripts que querés agregar,\n"
+                "luego clic derecho en el grupo destino → Agregar scripts.", "info")
+            return
+
+        # Assign group to selected scripts
+        for idx in indices:
+            self.playlist[idx]["group"] = group_path
+
+        # Make all group items contiguous, with newly added at the end
+        all_group = set(self._get_group_indices(group_path))
+        before = [item for i, item in enumerate(self.playlist)
+                  if i not in all_group]
+        group_items = [self.playlist[i] for i in sorted(all_group)]
+        self.playlist = before + group_items
+        self._refresh_list()
 
     def _context_ungroup(self, group_path):
         """Ungroup all items in a group (via right-click menu)."""
@@ -1215,16 +1244,19 @@ class OrchestratorApp:
         elif item_type == "script":
             idx = ref
             if idx > 0:
-                # Only move within the same group (or both ungrouped)
                 cur_group = self.playlist[idx].get("group", None)
                 prev_group = self.playlist[idx - 1].get("group", None)
                 if cur_group == prev_group:
+                    # Same group — simple swap
                     self.playlist[idx], self.playlist[idx - 1] = (
                         self.playlist[idx - 1],
                         self.playlist[idx],
                     )
                     self._refresh_list()
                     self._reselect_script(idx - 1)
+                else:
+                    # Different group — try block-level swap
+                    self._move_script_past_block(idx, direction="up")
 
     def _move_down(self):
         sel = self.tree.selection()
@@ -1241,20 +1273,59 @@ class OrchestratorApp:
         elif item_type == "script":
             idx = ref
             if idx < len(self.playlist) - 1:
-                # Only move within the same group (or both ungrouped)
                 cur_group = self.playlist[idx].get("group", None)
                 nxt_group = self.playlist[idx + 1].get("group", None)
                 if cur_group == nxt_group:
+                    # Same group — simple swap
                     self.playlist[idx], self.playlist[idx + 1] = (
                         self.playlist[idx + 1],
                         self.playlist[idx],
                     )
                     self._refresh_list()
                     self._reselect_script(idx + 1)
+                else:
+                    # Different group — try block-level swap
+                    self._move_script_past_block(idx, direction="down")
 
     # ═══════════════════════════════════════════════════════════════
     # GROUP / BLOCK MOVEMENT
     # ═══════════════════════════════════════════════════════════════
+
+    def _move_script_past_block(self, idx, direction):
+        """Swap a script with the entire adjacent block of items that share
+        the same group (different from the script's own group)."""
+        if direction == "up":
+            if idx <= 0:
+                return
+            # Find the block above: items sharing the same group as the item directly above
+            adj_group = self.playlist[idx - 1].get("group")
+            block_start = idx - 1
+            while block_start > 0 and self.playlist[block_start - 1].get("group") == adj_group:
+                block_start -= 1
+            above_block = self.playlist[block_start:idx]
+            script = self.playlist[idx:idx + 1]
+            # Swap: script moves before the block
+            self.playlist = (self.playlist[:block_start] + script + above_block +
+                             self.playlist[idx + 1:])
+            new_idx = block_start
+        else:  # down
+            if idx >= len(self.playlist) - 1:
+                return
+            # Find the block below: items sharing the same group as the item directly below
+            adj_group = self.playlist[idx + 1].get("group")
+            block_end = idx + 2
+            while (block_end < len(self.playlist) and
+                   self.playlist[block_end].get("group") == adj_group):
+                block_end += 1
+            below_block = self.playlist[idx + 1:block_end]
+            script = self.playlist[idx:idx + 1]
+            # Swap: script moves after the block
+            self.playlist = (self.playlist[:idx] + below_block + script +
+                             self.playlist[block_end:])
+            new_idx = idx + len(below_block)
+
+        self._refresh_list()
+        self._reselect_script(new_idx)
 
     def _get_group_indices(self, group_name):
         """Return playlist indices for items in a group, including nested children."""
