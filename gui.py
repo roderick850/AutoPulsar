@@ -1208,26 +1208,38 @@ class OrchestratorApp:
         the new group nests inside it. Supports multi-select for batch grouping."""
         sel = self.tree.selection()
         if not sel:
-            self._dark_dialog("Seleccionar", "Seleccioná scripts para agrupar.", "info")
+            self._dark_dialog("Seleccionar", "Seleccioná scripts para agrupar.\n"
+                              "Ctrl+Click en un 📁 grupo + scripts para crear subgrupo.", "info")
             return
 
         # Separate group headers and scripts from selection
-        parent_path = None  # If a group header is selected, nest inside it
+        parent_path = None
         indices = []
         for iid in sel:
             info = self._item_map.get(iid)
             if info is None:
                 continue
             if info[0] == "group":
-                parent_path = info[1] if parent_path is None else parent_path
+                parent_path = info[1]  # Use last group in selection as parent
             elif info[0] == "script":
                 indices.append(info[1])
 
         if not indices:
-            self._dark_dialog("Grupo", "Seleccioná al menos un script.", "info")
+            self._dark_dialog("Grupo",
+                "Seleccioná al menos un script junto con el grupo padre.\n\n"
+                "1. Ctrl+Click en el 📁 grupo destino\n"
+                "2. Ctrl+Click en los scripts a agrupar\n"
+                "3. Clic en 📁 Agrupar", "info")
             return
 
-        self._ask_group_name(lambda name: self._do_group(indices, name, parent_path))
+        # Build descriptive label for the dialog
+        if parent_path:
+            label = f"Crear subgrupo dentro de «{parent_path}»\nNombre del subgrupo:"
+        else:
+            label = "Nombre del grupo:"
+
+        self._ask_group_name(lambda name: self._do_group(indices, name, parent_path),
+                           label=label)
 
     def _do_group(self, indices, group_name, parent_path=None):
         """Assign the given indices to `group_name`, optionally nested under parent_path."""
@@ -1317,11 +1329,11 @@ class OrchestratorApp:
 
         self._refresh_list()
 
-    def _ask_group_name(self, callback):
+    def _ask_group_name(self, callback, label="Nombre:"):
         """Show a small dialog to ask for a group name."""
         win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Nombre del grupo")
-        win.geometry("280x120")
+        win.geometry("300x130")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
@@ -1332,12 +1344,15 @@ class OrchestratorApp:
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"280x120+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        win.geometry(f"300x130+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(form, text="Nombre:", style="Compact.TLabel").pack(anchor=tk.W, pady=(0, 5))
+        # Support multi-line labels
+        for line in label.split("\n"):
+            ttk.Label(form, text=line, style="Compact.TLabel").pack(anchor=tk.W)
+        ttk.Label(form, text="", style="Compact.TLabel").pack()  # spacer
         name_var = tk.StringVar()
         entry = ttk.Entry(form, textvariable=name_var, width=30)
         entry.pack(fill=tk.X, pady=(0, 8))
