@@ -458,8 +458,6 @@ class OrchestratorApp:
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
         # Double-click on editable columns for inline editing
         self.tree.bind("<Double-1>", self._on_tree_double_click)
-        # Click on tree column (#0) toggles expand/collapse manually
-        self.tree.bind("<Button-1>", self._on_tree_single_click, add="+")
         self._inline_entry = None
 
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
@@ -684,12 +682,18 @@ class OrchestratorApp:
             self.tree.delete(i)
         self._item_map.clear()
 
+        # Tag styles for visual differentiation
         self.tree.tag_configure("group_row",
             font=("Segoe UI", 9, "bold"),
             background=DARK_COLORS["surface_alt"],
             foreground=DARK_COLORS["text"],
         )
-        self.tree.tag_configure("script_row",
+        self.tree.tag_configure("script_grouped",
+            font=("Segoe UI", 9),
+            background="#252540",  # subtle tint — distinto al fondo base
+            foreground=DARK_COLORS["text"],
+        )
+        self.tree.tag_configure("script_ungrouped",
             font=("Segoe UI", 9),
             background=DARK_COLORS["surface"],
             foreground=DARK_COLORS["text"],
@@ -723,24 +727,24 @@ class OrchestratorApp:
                         self._item_map[group_iid] = ("group", current_path)
                     parent_iid = group_nodes[current_path]
 
-                # Insert script under deepest group
+                # Script inside a group — tinted background
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text="",
                     values=(idx + 1, check, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
-                    tags=("script_row",),
+                    tags=("script_grouped",),
                 )
             else:
-                # Ungrouped — insert at root
+                # Ungrouped — default surface background
                 script_iid = self.tree.insert(
                     "", tk.END,
                     text="",
                     values=(idx + 1, check, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
-                    tags=("script_row",),
+                    tags=("script_ungrouped",),
                 )
             self._item_map[script_iid] = ("script", idx)
 
@@ -764,23 +768,6 @@ class OrchestratorApp:
         current = self.playlist[idx].get("enabled", True)
         self.playlist[idx]["enabled"] = not current
         self._refresh_list()
-
-    def _on_tree_single_click(self, event):
-        """Handle click on tree column (#0) for manual expand/collapse of groups."""
-        column = self.tree.identify_column(event.x)
-        item_id = self.tree.identify_row(event.y)
-
-        if column != "#0" or not item_id:
-            return
-
-        info = self._item_map.get(item_id)
-        if info is None or info[0] != "group":
-            return
-
-        # Toggle open/closed (treeview already handles this natively,
-        # but this ensures it works even if the expander arrow is missed)
-        current = self.tree.item(item_id, "open")
-        self.tree.item(item_id, open=not current)
 
     def _on_tree_double_click(self, event):
         """Inline editing: double-click on reps/duration/pause cell to edit directly.
