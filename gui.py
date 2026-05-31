@@ -435,7 +435,7 @@ class OrchestratorApp:
             list_frame, columns=columns, show="tree headings", selectmode="extended"
         )
         # Column #0 = tree column (expander arrows for groups)
-        self.tree.column("#0", width=22, minwidth=22, stretch=False, anchor="w")
+        self.tree.column("#0", width=30, minwidth=24, stretch=False, anchor="w")
         self.tree.heading("#0", text="")
 
         self.tree.heading("orden", text="#")
@@ -730,8 +730,8 @@ class OrchestratorApp:
                     parent_iid = group_nodes[current_path]
 
                 # Script inside a group — tinted background
-                # Indent script name by 4 spaces per nesting depth beyond the first level
-                indent = "    " * (len(parts) - 1)
+                # Indent script name: 2 spaces base + 4 per extra nesting depth
+                indent = "  " + "    " * (len(parts) - 1)
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
