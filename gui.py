@@ -730,10 +730,12 @@ class OrchestratorApp:
                     parent_iid = group_nodes[current_path]
 
                 # Script inside a group — tinted background
+                # Indent script name by 4 spaces per nesting depth beyond the first level
+                indent = "    " * (len(parts) - 1)
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
-                    values=(idx + 1, check, os.path.basename(item["path"]),
+                    values=(idx + 1, check, f"{indent}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_grouped",),
