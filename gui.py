@@ -129,6 +129,9 @@ class OrchestratorApp:
         self.mini_bar = None
         self._mini_bar_enabled = self.settings.get("mini_bar_enabled", True)
 
+        # ── Treeview item map (iid → type/index) ──
+        self._item_map = {}
+
         # ── Menu Bar ──
         self._build_menu()
 
@@ -240,9 +243,11 @@ class OrchestratorApp:
     def _menu_about(self):
         """Mostrar diálogo Acerca de."""
         msg = (
-            "TinyTask Orchestrator v1.0.3\n\n"
+            "TinyTask Orchestrator v1.1.0\n\n"
             "Automatización de tareas con ejecución\n"
             "por tiempos fijos, loops y hotkeys globales.\n\n"
+            "Agrupamiento de scripts — organizá tareas\n"
+            "en grupos y movelos como bloques. 📁\n\n"
             "Modo Mini Bar para gaming en monitor único.\n\n"
             "Creado por Roderick + Hefesto 🛠️"
         )
@@ -427,7 +432,7 @@ class OrchestratorApp:
 
         columns = ("orden", "hab", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
-            list_frame, columns=columns, show="headings", selectmode="browse"
+            list_frame, columns=columns, show="headings", selectmode="extended"
         )
         self.tree.heading("orden", text="#")
         self.tree.heading("hab", text="✓")
@@ -478,6 +483,20 @@ class OrchestratorApp:
         )
         ttk.Button(btn_frame, text="⬇", command=self._move_down, style="Compact.TButton", width=3).pack(
             side=tk.LEFT, padx=1
+        )
+
+        # ===== Frame botones de grupo =====
+        group_btn_frame = ttk.Frame(self.root)
+        group_btn_frame.pack(fill=tk.X, padx=5, pady=(0, 3))
+
+        ttk.Button(group_btn_frame, text="📁 Agrupar", command=self._group_selected, style="Compact.TButton").pack(
+            side=tk.LEFT, padx=2
+        )
+        ttk.Button(group_btn_frame, text="✂️ Desagrupar", command=self._ungroup_selected, style="Compact.TButton").pack(
+            side=tk.LEFT, padx=2
+        )
+        ttk.Button(group_btn_frame, text="🏷️ Renombrar", command=self._rename_group, style="Compact.TButton").pack(
+            side=tk.LEFT, padx=2
         )
 
         # ===== Frame ejecución (compacto) =====
@@ -656,24 +675,54 @@ class OrchestratorApp:
     def _refresh_list(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
+        self._item_map.clear()
+
+        # Configure group row tag
+        self.tree.tag_configure("group_row",
+            font=("Segoe UI", 9, "bold"),
+            background=DARK_COLORS["surface_alt"],
+            foreground=DARK_COLORS["text"],
+        )
+        self.tree.tag_configure("script_row",
+            font=("Segoe UI", 9),
+            background=DARK_COLORS["surface"],
+            foreground=DARK_COLORS["text"],
+        )
+
+        current_group = None
         for idx, item in enumerate(self.playlist):
+            group = item.get("group", None)
             item_time = self._calc_item_time(item)
-            # Backward compat: items without "enabled" default to True
             enabled = item.get("enabled", True)
             check = "✅" if enabled else "❌"
-            self.tree.insert(
-                "",
-                tk.END,
+
+            # Insert group header when entering a new group
+            if group is not None and group != current_group:
+                group_iid = self.tree.insert(
+                    "", tk.END,
+                    values=("", "", f"📁 {group}", "", "", "", ""),
+                    tags=("group_row",),
+                )
+                self._item_map[group_iid] = ("group", group)
+                current_group = group
+            elif group is None:
+                current_group = None
+
+            # Insert script row
+            script_iid = self.tree.insert(
+                "", tk.END,
                 values=(
                     idx + 1,
                     check,
-                    os.path.basename(item["path"]),
+                    f"    {os.path.basename(item['path'])}",
                     item["repetitions"],
                     item["duration"],
                     item["pause"],
                     format_time(item_time),
                 ),
+                tags=("script_row",),
             )
+            self._item_map[script_iid] = ("script", idx)
         self._update_time_labels()
 
     def _on_tree_click(self, event):
@@ -686,31 +735,41 @@ class OrchestratorApp:
         if region != "cell" or column != "#2" or not item_id:
             return
 
-        idx = self.tree.index(item_id)
-        # Toggle
+        info = self._item_map.get(item_id)
+        if info is None or info[0] != "script":
+            return  # Don't toggle groups
+
+        idx = info[1]
         current = self.playlist[idx].get("enabled", True)
         self.playlist[idx]["enabled"] = not current
         self._refresh_list()
-        # Re-select the toggled item
-        children = self.tree.get_children()
-        if idx < len(children):
-            self.tree.selection_set(children[idx])
 
     def _on_tree_double_click(self, event):
-        """Inline editing: double-click on reps/duration/pause cell to edit directly."""
-        # Dismiss any previous inline entry
+        """Inline editing: double-click on reps/duration/pause cell to edit directly.
+        Double-click on group header renames the group."""
         self._dismiss_inline_edit()
 
         region = self.tree.identify_region(event.x, event.y)
         column = self.tree.identify_column(event.x)
         item_id = self.tree.identify_row(event.y)
 
-        # Editable columns: "#4"=reps, "#5"=duration, "#6"=pause
-        editable_columns = {"#4": "repetitions", "#5": "duration", "#6": "pause"}
-        if region != "cell" or column not in editable_columns or not item_id:
+        info = self._item_map.get(item_id)
+        if info is None:
             return
 
-        idx = self.tree.index(item_id)
+        # ── Double-click on group header → rename ──
+        if info[0] == "group":
+            self._rename_group_dialog(info[1])
+            return
+
+        # ── Script editing ──
+        if region != "cell":
+            return
+        idx = info[1]
+
+        editable_columns = {"#4": "repetitions", "#5": "duration", "#6": "pause"}
+        if column not in editable_columns:
+            return
         field = editable_columns[column]
         current_value = self.playlist[idx][field]
 
@@ -889,6 +948,7 @@ class OrchestratorApp:
                     "duration": dur_var.get(),
                     "pause": pause_var.get(),
                     "enabled": True,
+                    "group": None,
                 }
             )
             self._refresh_list()
@@ -901,7 +961,11 @@ class OrchestratorApp:
         if not sel:
             self._dark_dialog("Seleccionar", "Seleccioná un script de la lista para editarlo.", "info")
             return
-        idx = self.tree.index(sel[0])
+        info = self._item_map.get(sel[0])
+        if info is None or info[0] != "script":
+            self._dark_dialog("Grupo", "Seleccioná un script, no un header de grupo.", "info")
+            return
+        idx = info[1]
         item = self.playlist[idx]
 
         win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
@@ -973,8 +1037,19 @@ class OrchestratorApp:
         sel = self.tree.selection()
         if not sel:
             return
-        idx = self.tree.index(sel[0])
-        del self.playlist[idx]
+        info = self._item_map.get(sel[0])
+        if info is None:
+            return
+
+        item_type, ref = info
+
+        if item_type == "group":
+            # Remove all items in the group
+            indices = self._get_group_indices(ref)
+            for i in sorted(indices, reverse=True):
+                del self.playlist[i]
+        elif item_type == "script":
+            del self.playlist[ref]
         self._refresh_list()
 
     def _clone_script(self):
@@ -983,41 +1058,251 @@ class OrchestratorApp:
         if not sel:
             self._dark_dialog("Seleccionar", "Seleccioná un script de la lista para clonarlo.", "info")
             return
-        idx = self.tree.index(sel[0])
+        info = self._item_map.get(sel[0])
+        if info is None or info[0] != "script":
+            self._dark_dialog("Grupo", "Seleccioná un script, no un header de grupo.", "info")
+            return
+        idx = info[1]
         original = self.playlist[idx]
         clone = dict(original)
         self.playlist.insert(idx + 1, clone)
         self._refresh_list()
-        # Seleccionar el clon
-        children = self.tree.get_children()
-        if idx + 1 < len(children):
-            self.tree.selection_set(children[idx + 1])
 
     def _move_up(self):
         sel = self.tree.selection()
         if not sel:
             return
-        idx = self.tree.index(sel[0])
-        if idx > 0:
-            self.playlist[idx], self.playlist[idx - 1] = (
-                self.playlist[idx - 1],
-                self.playlist[idx],
-            )
-            self._refresh_list()
-            self.tree.selection_set(self.tree.get_children()[idx - 1])
+        info = self._item_map.get(sel[0])
+        if info is None:
+            return
+
+        item_type, ref = info
+
+        if item_type == "group":
+            self._move_block_up(ref)
+        elif item_type == "script":
+            idx = ref
+            if idx > 0:
+                self.playlist[idx], self.playlist[idx - 1] = (
+                    self.playlist[idx - 1],
+                    self.playlist[idx],
+                )
+                self._refresh_list()
 
     def _move_down(self):
         sel = self.tree.selection()
         if not sel:
             return
-        idx = self.tree.index(sel[0])
-        if idx < len(self.playlist) - 1:
-            self.playlist[idx], self.playlist[idx + 1] = (
-                self.playlist[idx + 1],
-                self.playlist[idx],
-            )
-            self._refresh_list()
-            self.tree.selection_set(self.tree.get_children()[idx + 1])
+        info = self._item_map.get(sel[0])
+        if info is None:
+            return
+
+        item_type, ref = info
+
+        if item_type == "group":
+            self._move_block_down(ref)
+        elif item_type == "script":
+            idx = ref
+            if idx < len(self.playlist) - 1:
+                self.playlist[idx], self.playlist[idx + 1] = (
+                    self.playlist[idx + 1],
+                    self.playlist[idx],
+                )
+                self._refresh_list()
+
+    # ═══════════════════════════════════════════════════════════════
+    # GROUP / BLOCK MOVEMENT
+    # ═══════════════════════════════════════════════════════════════
+
+    def _get_group_indices(self, group_name):
+        """Return sorted list of playlist indices for items in a group."""
+        return [i for i, item in enumerate(self.playlist)
+                if item.get("group") == group_name]
+
+    def _to_blocks(self):
+        """Convert playlist to blocks. Each block is [item, ...] (ungrouped=1-item block)."""
+        blocks = []
+        i = 0
+        while i < len(self.playlist):
+            item = self.playlist[i]
+            group = item.get("group", None)
+            if group is not None:
+                block = []
+                while i < len(self.playlist) and self.playlist[i].get("group") == group:
+                    block.append(self.playlist[i])
+                    i += 1
+                blocks.append(block)
+            else:
+                blocks.append([item])
+                i += 1
+        return blocks
+
+    def _blocks_to_playlist(self, blocks):
+        """Flatten blocks back to playlist."""
+        result = []
+        for block in blocks:
+            result.extend(block)
+        return result
+
+    def _find_block_index(self, blocks, group_name):
+        """Find the index of the block with the given group name."""
+        for bi, block in enumerate(blocks):
+            if len(block) > 1 and block[0].get("group") == group_name:
+                return bi
+        return -1
+
+    def _move_block_up(self, group_name):
+        """Move an entire group block up by one position."""
+        blocks = self._to_blocks()
+        bi = self._find_block_index(blocks, group_name)
+        if bi <= 0:
+            return
+        blocks[bi], blocks[bi - 1] = blocks[bi - 1], blocks[bi]
+        self.playlist = self._blocks_to_playlist(blocks)
+        self._refresh_list()
+
+    def _move_block_down(self, group_name):
+        """Move an entire group block down by one position."""
+        blocks = self._to_blocks()
+        bi = self._find_block_index(blocks, group_name)
+        if bi < 0 or bi >= len(blocks) - 1:
+            return
+        blocks[bi], blocks[bi + 1] = blocks[bi + 1], blocks[bi]
+        self.playlist = self._blocks_to_playlist(blocks)
+        self._refresh_list()
+
+    # ═══════════════════════════════════════════════════════════════
+    # GROUP OPERATIONS
+    # ═══════════════════════════════════════════════════════════════
+
+    def _group_selected(self):
+        """Assign the selected script(s) to a new or existing group."""
+        sel = self.tree.selection()
+        if not sel:
+            self._dark_dialog("Seleccionar", "Seleccioná uno o más scripts para agrupar.", "info")
+            return
+
+        # Collect unique script indices from selection
+        indices = []
+        for iid in sel:
+            info = self._item_map.get(iid)
+            if info and info[0] == "script":
+                indices.append(info[1])
+
+        if not indices:
+            self._dark_dialog("Grupo", "Seleccioná scripts (no headers de grupo).", "info")
+            return
+
+        # Ask for group name
+        self._ask_group_name(lambda name: self._do_group(indices, name))
+
+    def _do_group(self, indices, group_name):
+        """Assign the given playlist indices to `group_name` and sort them together."""
+        if not group_name.strip():
+            return
+        group_name = group_name.strip()
+
+        # Assign group to all selected items
+        for idx in indices:
+            self.playlist[idx]["group"] = group_name
+
+        # Move all group items to be contiguous starting at the first selected index
+        group_items = [self.playlist[i] for i in indices]
+        all_group_indices = self._get_group_indices(group_name)
+        # Remove all existing items of this group
+        for i in sorted(all_group_indices, reverse=True):
+            del self.playlist[i]
+        # Insert all group items at the position of the first selected
+        insert_at = min(indices)
+        for item in reversed(group_items):
+            self.playlist.insert(insert_at, item)
+
+        self._refresh_list()
+
+    def _ungroup_selected(self):
+        """Remove group assignment from selected scripts."""
+        sel = self.tree.selection()
+        if not sel:
+            return
+
+        indices = []
+        group_to_clear = None
+        for iid in sel:
+            info = self._item_map.get(iid)
+            if info is None:
+                continue
+            if info[0] == "group":
+                group_to_clear = info[1]
+            elif info[0] == "script":
+                indices.append(info[1])
+
+        # If a group header was selected, ungroup all items in that group
+        if group_to_clear:
+            indices = self._get_group_indices(group_to_clear)
+
+        for idx in indices:
+            self.playlist[idx]["group"] = None
+
+        self._refresh_list()
+
+    def _rename_group(self):
+        """Rename the selected group."""
+        sel = self.tree.selection()
+        if not sel:
+            return
+        info = self._item_map.get(sel[0])
+        if info is None or info[0] != "group":
+            self._dark_dialog("Grupo", "Seleccioná un header de grupo para renombrar.", "info")
+            return
+
+        self._rename_group_dialog(info[1])
+
+    def _rename_group_dialog(self, old_name):
+        """Show dialog to rename a group."""
+        group_indices = self._get_group_indices(old_name)
+        self._ask_group_name(lambda new_name: self._do_rename_group(old_name, new_name))
+
+    def _do_rename_group(self, old_name, new_name):
+        """Rename all items from old_name to new_name."""
+        if not new_name.strip() or new_name.strip() == old_name:
+            return
+        new_name = new_name.strip()
+        for idx in self._get_group_indices(old_name):
+            self.playlist[idx]["group"] = new_name
+        self._refresh_list()
+
+    def _ask_group_name(self, callback):
+        """Show a small dialog to ask for a group name."""
+        win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        win.title("Nombre del grupo")
+        win.geometry("280x120")
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+        win.lift()
+
+        win.after(50, lambda: _apply_dark_titlebar(win, retries=3))
+        win.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = win.winfo_width(), win.winfo_height()
+        win.geometry(f"280x120+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
+        form = ttk.Frame(win, padding=10)
+        form.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(form, text="Nombre:", style="Compact.TLabel").pack(anchor=tk.W, pady=(0, 5))
+        name_var = tk.StringVar()
+        entry = ttk.Entry(form, textvariable=name_var, width=30)
+        entry.pack(fill=tk.X, pady=(0, 8))
+        entry.focus_set()
+
+        def save():
+            callback(name_var.get())
+            win.destroy()
+
+        entry.bind("<Return>", lambda e: save())
+        ttk.Button(form, text="Guardar", command=save, style="Compact.TButton").pack()
 
     # ═══════════════════════════════════════════════════════════════
     # EXECUTION
@@ -1053,7 +1338,11 @@ class OrchestratorApp:
         if not sel:
             self._dark_dialog("Seleccionar", "Seleccioná un script de la lista para ejecutarlo solo.", "info")
             return
-        idx = self.tree.index(sel[0])
+        info = self._item_map.get(sel[0])
+        if info is None or info[0] != "script":
+            self._dark_dialog("Grupo", "Seleccioná un script, no un header de grupo.", "info")
+            return
+        idx = info[1]
         item = self.playlist[idx]
 
         # Force single-run settings for the selected item only
