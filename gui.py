@@ -680,6 +680,12 @@ class OrchestratorApp:
 
     def _refresh_list(self):
         """Rebuild treeview from flat playlist using group paths for hierarchy."""
+        # ── Capture current open/close state of all groups ──
+        old_open_state = {}
+        for iid, (typ, data) in self._item_map.items():
+            if typ == "group":
+                old_open_state[data] = self.tree.item(iid, "open")
+
         for i in self.tree.get_children():
             self.tree.delete(i)
         self._item_map.clear()
@@ -723,7 +729,7 @@ class OrchestratorApp:
                             text=" ",  # columna árbol necesita contenido para jerarquía
                             values=("", "", f"📁 {part}", "", "", "", ""),
                             tags=("group_row",),
-                            open=True,
+                            open=old_open_state.get(current_path, True),
                         )
                         group_nodes[current_path] = group_iid
                         self._item_map[group_iid] = ("group", current_path)
