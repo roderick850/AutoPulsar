@@ -243,7 +243,7 @@ class OrchestratorApp:
     def _menu_about(self):
         """Mostrar diálogo Acerca de."""
         msg = (
-            "TinyTask Orchestrator v1.1.0\n\n"
+            "TinyTask Orchestrator v1.2.0\n\n"
             "Automatización de tareas con ejecución\n"
             "por tiempos fijos, loops y hotkeys globales.\n\n"
             "Agrupamiento de scripts — organizá tareas\n"
@@ -744,13 +744,15 @@ class OrchestratorApp:
                 parent_iid = ""
                 current_path = ""
 
-                for part in parts:
+                for depth, part in enumerate(parts):
                     current_path = f"{current_path}/{part}" if current_path else part
                     if current_path not in group_nodes:
+                        # Indent subgroup names same formula as scripts
+                        group_indent = "  " + "    " * depth
                         group_iid = self.tree.insert(
                             parent_iid, tk.END,
                             text=" ",  # columna árbol necesita contenido para jerarquía
-                            values=("", "", "", f"📁 {part}", "", "", "", ""),
+                            values=("", "", "", f"{group_indent}📁 {part}", "", "", "", ""),
                             tags=("group_row",),
                             open=old_open_state.get(current_path, True),
                         )
@@ -781,6 +783,24 @@ class OrchestratorApp:
                 )
             self._item_map[script_iid] = ("script", idx)
 
+        # ── Update group rows with enabled/primero summary ──
+        for path, iid in group_nodes.items():
+            indices = [
+                i for i, item in enumerate(self.playlist)
+                if item.get("group") and
+                (item["group"] == path or item["group"].startswith(path + "/"))
+            ]
+            if indices:
+                enabled_count = sum(1 for i in indices if self.playlist[i].get("enabled", True))
+                primero_count = sum(1 for i in indices if self.playlist[i].get("first_loop_only", False))
+                total = len(indices)
+                hab_text = "✅" if enabled_count == total else f"{enabled_count}/{total}"
+                primero_text = "🔂" if primero_count == total and total > 0 else (str(primero_count) if primero_count else "")
+                current = list(self.tree.item(iid, "values"))
+                current[1] = hab_text   # col #2 (hab)
+                current[2] = primero_text  # col #3 (primero)
+                self.tree.item(iid, values=current)
+
         self._update_time_labels()
 
         # ── Persist collapsed group state ──
@@ -794,7 +814,8 @@ class OrchestratorApp:
         self.tree.update_idletasks()
 
     def _on_tree_click(self, event):
-        """Toggle enabled/disabled or first_loop_only when clicking their columns."""
+        """Toggle enabled/disabled or first_loop_only when clicking their columns.
+        On group rows, toggles all scripts inside the group."""
         region = self.tree.identify_region(event.x, event.y)
         column = self.tree.identify_column(event.x)
         item_id = self.tree.identify_row(event.y)
@@ -803,8 +824,32 @@ class OrchestratorApp:
             return
 
         info = self._item_map.get(item_id)
-        if info is None or info[0] != "script":
-            return  # Don't toggle groups
+        if info is None:
+            return
+
+        # ── Group toggle: apply to all scripts in the group ──
+        if info[0] == "group":
+            group_path = info[1]
+            indices = self._get_group_indices(group_path)
+            if not indices:
+                return
+            if column == "#2":  # hab
+                any_enabled = any(self.playlist[i].get("enabled", True) for i in indices)
+                new_state = not any_enabled
+                for i in indices:
+                    self.playlist[i]["enabled"] = new_state
+                self._refresh_list()
+            elif column == "#3":  # primero
+                any_primero = any(self.playlist[i].get("first_loop_only", False) for i in indices)
+                new_state = not any_primero
+                for i in indices:
+                    self.playlist[i]["first_loop_only"] = new_state
+                self._refresh_list()
+            return
+
+        # ── Script toggle ──
+        if info[0] != "script":
+            return
 
         idx = info[1]
 
@@ -849,7 +894,7 @@ class OrchestratorApp:
             return
         idx = info[1]
 
-        editable_columns = {"#4": "repetitions", "#5": "duration", "#6": "pause"}
+        editable_columns = {"#5": "repetitions", "#6": "duration", "#7": "pause"}
         if column not in editable_columns:
             return
         field = editable_columns[column]
