@@ -3,6 +3,12 @@ import threading
 import time
 import os
 
+try:
+    from icon_detector import check_icon
+    HAS_ICON_DETECTOR = True
+except ImportError:
+    HAS_ICON_DETECTOR = False
+
 
 class Executor(threading.Thread):
     def __init__(self, playlist, settings, callbacks, stop_event, launch_event):
@@ -68,6 +74,13 @@ class Executor(threading.Thread):
                 # Skip first_loop_only items after the first loop
                 if current_loop > 1 and item.get("first_loop_only", False):
                     continue
+
+                # Check icon requirement — skip if icon not visible on screen
+                icon_path = item.get("icon_path", "")
+                if icon_path and HAS_ICON_DETECTOR:
+                    if not check_icon(icon_path):
+                        self._safe_callback("on_skip_icon", idx, os.path.basename(item["path"]))
+                        continue
 
                 name = os.path.basename(item["path"])
                 reps = item["repetitions"]

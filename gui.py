@@ -6,7 +6,7 @@ import threading
 import time
 import ctypes
 
-from config_manager import load_config, save_config, DEFAULT_SETTINGS
+from config_manager import load_config, save_config, get_config_path, DEFAULT_SETTINGS
 from executor import Executor
 from hotkey import HotkeyListener
 from mini_bar import MiniBar, format_time as mini_format_time
@@ -430,7 +430,7 @@ class OrchestratorApp:
         list_frame = ttk.Frame(self.root)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
-        columns = ("orden", "hab", "primero", "nombre", "reps", "duracion", "pausa", "tiempo")
+        columns = ("orden", "hab", "primero", "icono", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
             list_frame, columns=columns, show="tree headings", selectmode="extended",
         )
@@ -441,6 +441,7 @@ class OrchestratorApp:
         self.tree.heading("orden", text="#")
         self.tree.heading("hab", text="✓")
         self.tree.heading("primero", text="1°")
+        self.tree.heading("icono", text="🖼")
         self.tree.heading("nombre", text="Script")
         self.tree.heading("reps", text="Reps")
         self.tree.heading("duracion", text="Dur (s)")
@@ -450,7 +451,8 @@ class OrchestratorApp:
         self.tree.column("orden", width=28, anchor="center")
         self.tree.column("hab", width=26, anchor="center")
         self.tree.column("primero", width=28, anchor="center")
-        self.tree.column("nombre", width=190, anchor="w")
+        self.tree.column("icono", width=26, anchor="center")
+        self.tree.column("nombre", width=175, anchor="w")
         self.tree.column("reps", width=50, anchor="center")
         self.tree.column("duracion", width=55, anchor="center")
         self.tree.column("pausa", width=55, anchor="center")
@@ -738,6 +740,7 @@ class OrchestratorApp:
             enabled = item.get("enabled", True)
             check = "✅" if enabled else "❌"
             primero = "🔂" if item.get("first_loop_only", False) else ""
+            icono = "🖼️" if item.get("icon_path", "") else ""
 
             if group:
                 parts = group.split("/")
@@ -752,7 +755,7 @@ class OrchestratorApp:
                         group_iid = self.tree.insert(
                             parent_iid, tk.END,
                             text=" ",  # columna árbol necesita contenido para jerarquía
-                            values=("", "", "", f"{group_indent}📁 {part}", "", "", "", ""),
+                            values=("", "", "", "", f"{group_indent}📁 {part}", "", "", "", ""),
                             tags=("group_row",),
                             open=old_open_state.get(current_path, True),
                         )
@@ -766,7 +769,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, f"{indent}{os.path.basename(item['path'])}",
+                    values=(idx + 1, check, primero, icono, f"{indent}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_grouped",),
@@ -776,7 +779,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     "", tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, os.path.basename(item["path"]),
+                    values=(idx + 1, check, primero, icono, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_ungrouped",),
@@ -861,6 +864,8 @@ class OrchestratorApp:
             current = self.playlist[idx].get("first_loop_only", False)
             self.playlist[idx]["first_loop_only"] = not current
             self._refresh_list()
+        elif column == "#4":  # icono (capture/select)
+            self._capture_icon_for(idx)
 
     def _on_group_expand_collapse(self, event):
         """Real-time sync of collapsed state when user clicks expand/collapse arrows."""
@@ -894,7 +899,7 @@ class OrchestratorApp:
             return
         idx = info[1]
 
-        editable_columns = {"#5": "repetitions", "#6": "duration", "#7": "pause"}
+        editable_columns = {"#6": "repetitions", "#7": "duration", "#8": "pause"}
         if column not in editable_columns:
             return
         field = editable_columns[column]
@@ -1122,6 +1127,112 @@ class OrchestratorApp:
         dlg.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         dlg.wait_window()
+
+    # ═══════════════════════════════════════════════════════════════
+    # ICON CAPTURE
+    # ═══════════════════════════════════════════════════════════════
+
+    def _capture_icon_for(self, idx):
+        """Abrir ventana de captura para seleccionar icono en pantalla."""
+        import subprocess, io, base64
+
+        # Tomar screenshot rápido
+        try:
+            import mss
+            with mss.mss() as sct:
+                screen = sct.grab(sct.monitors[1])
+                from PIL import Image
+                img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
+        except Exception:
+            try:
+                from PIL import ImageGrab
+                img = ImageGrab.grab(all_screens=True)
+            except Exception:
+                self._dark_dialog("Error", "No se pudo capturar la pantalla.", "error")
+                return
+
+        # Guardar temp
+        tmp_path = os.path.join(_get_app_dir(), "_capture_temp.png")
+        img.save(tmp_path)
+
+        self._icon_capture_idx = idx
+        self._icon_capture_img = img
+        self._show_capture_window(img)
+
+    def _show_capture_window(self, img):
+        """Mostrar ventana de selección de región sobre la screenshot."""
+        win = tk.Toplevel(self.root, bg="black")
+        win.attributes("-fullscreen", True)
+        win.attributes("-topmost", True)
+        win.configure(cursor="crosshair")
+
+        # Mostrar imagen de fondo
+        from PIL import ImageTk
+        photo = ImageTk.PhotoImage(img)
+        canvas = tk.Canvas(win, bg="black", highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+        canvas._photo_ref = photo  # mantener referencia
+
+        # Rectángulo de selección
+        rect = None
+        start_x = [0]
+        start_y = [0]
+
+        def on_mouse_down(event):
+            start_x[0] = event.x
+            start_y[0] = event.y
+            nonlocal rect
+            if rect:
+                canvas.delete(rect)
+            rect = canvas.create_rectangle(
+                event.x, event.y, event.x, event.y,
+                outline="#7c7cf8", width=2, dash=(4, 2)
+            )
+
+        def on_mouse_drag(event):
+            nonlocal rect
+            if rect:
+                canvas.coords(rect, start_x[0], start_y[0], event.x, event.y)
+
+        def on_mouse_up(event):
+            x1, y1 = start_x[0], start_y[0]
+            x2, y2 = event.x, event.y
+            if x1 > x2:
+                x1, x2 = x2, x1
+            if y1 > y2:
+                y1, y2 = y2, y1
+            w, h = x2 - x1, y2 - y1
+            win.destroy()
+            if w < 10 or h < 10:
+                return  # Selección muy chica, cancelar
+
+            # Recortar y guardar
+            cropped = self._icon_capture_img.crop((x1, y1, x2, y2))
+            icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+            os.makedirs(icons_dir, exist_ok=True)
+            idx = self._icon_capture_idx
+            fname = f"icon_{idx}_{os.path.basename(self.playlist[idx]['path'])}.png"
+            save_path = os.path.join(icons_dir, fname)
+            cropped.save(save_path)
+            self.playlist[idx]["icon_path"] = save_path
+            self._refresh_list()
+
+        def on_escape(event):
+            win.destroy()
+
+        canvas.bind("<ButtonPress-1>", on_mouse_down)
+        canvas.bind("<B1-Motion>", on_mouse_drag)
+        canvas.bind("<ButtonRelease-1>", on_mouse_up)
+        win.bind("<Escape>", on_escape)
+
+        # Instrucción breve
+        canvas.create_text(
+            img.width // 2, 30,
+            text="🖼️  Selecciona el área del icono (clic + arrastrar)  |  ESC para cancelar",
+            fill="#cdd6f4", font=("Segoe UI", 11, "bold"),
+            anchor=tk.N
+        )
 
     def _add_script(self):
         path = filedialog.askopenfilename(
@@ -1822,6 +1933,7 @@ class OrchestratorApp:
             ),
             "on_error": lambda msg: self.root.after(0, lambda: self._cb_error(msg)),
             "on_launch": lambda path: self.root.after(0, lambda: self._do_launch(path)),
+            "on_skip_icon": lambda idx, name: self.root.after(0, lambda: self._cb_skip_icon(idx, name)),
         }
 
         self.executor_thread = Executor(
@@ -2001,6 +2113,10 @@ class OrchestratorApp:
     def _set_status(self, text, color):
         """Update the status label with text and background color."""
         self.status_label.config(text=f" {text} ", bg=color)
+
+    def _cb_skip_icon(self, idx, name):
+        """Called when a script is skipped because its required icon is not visible."""
+        self._set_status(f"⏭️  Icono no visible: {name}", DARK_COLORS["yellow"])
 
     def _cb_error(self, msg):
         self._dark_dialog("Error", msg, "error")
