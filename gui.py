@@ -1147,11 +1147,13 @@ class OrchestratorApp:
         cond_copy = {
             "mode": conditions.get("mode", "and"),
             "items": [dict(c) for c in conditions.get("items", [])],
+            "retry": dict(conditions.get("retry", {"enabled": False, "count": 3, "delay": 5})),
+            "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "script": ""})),
         }
 
         dlg = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
-        dlg.geometry("420x380")
+        dlg.geometry("520x560")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
@@ -1169,8 +1171,20 @@ class OrchestratorApp:
         mode_combo = ttk.Combobox(mode_frame, textvariable=mode_var,
                                   values=["and", "or"], width=6, state="readonly")
         mode_combo.pack(side=tk.LEFT, padx=6)
-        ttk.Label(mode_frame, text="and = Todas  |  or = Alguna",
-                  style="Dim.TLabel").pack(side=tk.LEFT)
+
+        mode_help = {
+            "and": "⚠️ TODAS las condiciones deben cumplirse para ejecutar",
+            "or":  "✅ AL MENOS UNA condición debe cumplirse para ejecutar",
+        }
+
+        mode_hint = ttk.Label(mode_frame, text=mode_help.get(cond_copy["mode"], ""),
+                              style="Dim.TLabel")
+        mode_hint.pack(side=tk.LEFT)
+
+        def _on_mode_change(*_args):
+            mode_hint.configure(text=mode_help.get(mode_var.get(), ""))
+
+        mode_var.trace_add("write", _on_mode_change)
 
         # ── Lista de condiciones ──
         list_frame = ttk.Frame(dlg)
@@ -1209,74 +1223,118 @@ class OrchestratorApp:
         btn_frame.pack(fill=tk.X, **pad)
 
         def _add_condition():
-            # Abrir captura de pantalla
-            try:
-                import mss
-                with mss.mss() as sct:
-                    screen = sct.grab(sct.monitors[1])
-                    from PIL import Image
-                    img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
-            except Exception:
-                from PIL import ImageGrab
-                img = ImageGrab.grab(all_screens=True)
+            """Abre captura de pantalla — si hay múltiples monitores, pregunta cuál usar."""
+            import mss
+            from PIL import Image
 
-            # Ventana de selección
-            cap_win = tk.Toplevel(dlg, bg="black")
-            cap_win.attributes("-fullscreen", True)
-            cap_win.attributes("-topmost", True)
-            cap_win.configure(cursor="crosshair")
+            with mss.mss() as sct:
+                monitors = list(sct.monitors)  # [0]=virtual, [1..N]=físicos
 
-            from PIL import ImageTk
-            photo = ImageTk.PhotoImage(img)
-            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
-            canvas.pack(fill=tk.BOTH, expand=True)
-            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-            canvas._photo_ref = photo
+            num_physical = len(monitors) - 1  # sin contar el virtual
 
-            rect = None
-            start = [0, 0]
+            def _do_capture(monitor):
+                """Captura `monitor` y abre overlay de selección encima de él."""
+                nonlocal monitors
+                try:
+                    with mss.mss() as sct2:
+                        screen = sct2.grab(monitor)
+                        img2 = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
+                except Exception:
+                    from PIL import ImageGrab
+                    img2 = ImageGrab.grab(all_screens=True)
 
-            def on_down(e):
-                start[0], start[1] = e.x, e.y
-                nonlocal rect
-                if rect:
-                    canvas.delete(rect)
-                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
-                    outline="#7c7cf8", width=2, dash=(4,2))
+                cap_win = tk.Toplevel(dlg, bg="black")
+                # Posicionar en el monitor destino ANTES de fullscreen
+                cap_win.geometry(f"+{monitor['left']}+{monitor['top']}")
+                cap_win.attributes("-fullscreen", True)
+                cap_win.attributes("-topmost", True)
+                cap_win.configure(cursor="crosshair")
 
-            def on_drag(e):
-                nonlocal rect
-                if rect:
-                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+                from PIL import ImageTk
+                photo = ImageTk.PhotoImage(img2)
+                canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+                canvas.pack(fill=tk.BOTH, expand=True)
+                canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+                canvas._photo_ref = photo
 
-            def on_up(e):
-                x1, y1 = min(start[0], e.x), min(start[1], e.y)
-                x2, y2 = max(start[0], e.x), max(start[1], e.y)
-                cap_win.destroy()
-                if x2 - x1 < 10 or y2 - y1 < 10:
-                    return
-                # Recortar y guardar
-                cropped = img.crop((x1, y1, x2, y2))
-                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
-                os.makedirs(icons_dir, exist_ok=True)
-                fname = f"cond_{idx}_{len(cond_copy['items'])}_{int(time.time())}.png"
-                save_path = os.path.join(icons_dir, fname)
-                cropped.save(save_path)
-                cond_copy["items"].append({
-                    "type": "require",
-                    "icon_path": save_path,
-                    "label": "",
-                })
-                _refresh_cond_list()
+                rect = None
+                start = [0, 0]
 
-            canvas.bind("<ButtonPress-1>", on_down)
-            canvas.bind("<B1-Motion>", on_drag)
-            canvas.bind("<ButtonRelease-1>", on_up)
-            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
+                def on_down(e):
+                    start[0], start[1] = e.x, e.y
+                    nonlocal rect
+                    if rect:
+                        canvas.delete(rect)
+                    rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                        outline="#7c7cf8", width=2, dash=(4,2))
 
-            canvas.create_text(img.width // 2, 30,
-                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
-                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+                def on_drag(e):
+                    nonlocal rect
+                    if rect:
+                        canvas.coords(rect, start[0], start[1], e.x, e.y)
+
+                def on_up(e):
+                    x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                    x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                    cap_win.destroy()
+                    if x2 - x1 < 10 or y2 - y1 < 10:
+                        return
+                    # Recortar y guardar
+                    cropped = img2.crop((x1, y1, x2, y2))
+                    icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                    os.makedirs(icons_dir, exist_ok=True)
+                    fname = f"cond_{idx}_{len(cond_copy['items'])}_{int(time.time())}.png"
+                    save_path = os.path.join(icons_dir, fname)
+                    cropped.save(save_path)
+                    cond_copy["items"].append({
+                        "type": "require",
+                        "icon_path": save_path,
+                        "label": "",
+                    })
+                    _refresh_cond_list()
+
+                canvas.bind("<ButtonPress-1>", on_down)
+                canvas.bind("<B1-Motion>", on_drag)
+                canvas.bind("<ButtonRelease-1>", on_up)
+                cap_win.bind("<Escape>", lambda e: cap_win.destroy())
+
+                canvas.create_text(img2.width // 2, 30,
+                    text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                    fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+            if num_physical <= 1:
+                _do_capture(monitors[1])
+                return
+
+            # ── Más de un monitor: mostrar selector ──
+            sel_win = tk.Toplevel(dlg)
+            sel_win.title("Seleccionar monitor")
+            sel_win.configure(bg="#1e1e2e")
+            sel_win.resizable(False, False)
+
+            ttk.Label(sel_win, text="¿De qué monitor capturar?",
+                      font=("Segoe UI", 11, "bold"),
+                      background="#1e1e2e", foreground="#cdd6f4").pack(
+                          pady=(15, 10), padx=30)
+
+            btn_row = ttk.Frame(sel_win)
+            btn_row.pack(pady=(0, 15))
+
+            for i in range(1, num_physical + 1):
+                m = monitors[i]
+                size = f"{m['width']}×{m['height']}"
+                btn = ttk.Button(btn_row,
+                    text=f"Monitor {i}\n({size})",
+                    command=lambda m=m: [_do_capture(m), sel_win.destroy()])
+                btn.pack(side=tk.LEFT, padx=5)
+
+            # Centrar sobre el diálogo padre
+            sel_win.transient(dlg)
+            sel_win.grab_set()
+            sel_win.update_idletasks()
+            px = dlg.winfo_rootx() + (dlg.winfo_width() - sel_win.winfo_width()) // 2
+            py = dlg.winfo_rooty() + (dlg.winfo_height() - sel_win.winfo_height()) // 2
+            sel_win.geometry(f"+{px}+{py}")
 
         def _remove_condition():
             sel = tree.selection()
@@ -1285,6 +1343,13 @@ class OrchestratorApp:
             indices = sorted([int(s) for s in sel], reverse=True)
             for i in indices:
                 if 0 <= i < len(cond_copy["items"]):
+                    # Delete the icon file
+                    ipath = cond_copy["items"][i].get("icon_path", "")
+                    if ipath and os.path.exists(ipath):
+                        try:
+                            os.remove(ipath)
+                        except OSError:
+                            pass
                     del cond_copy["items"][i]
             _refresh_cond_list()
 
@@ -1333,21 +1398,112 @@ class OrchestratorApp:
         ttk.Button(btn_frame, text="🏷️ Etiqueta", command=_edit_label,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
+        def _preview_icon():
+            """Abrir la imagen del icono seleccionado con el visor del sistema."""
+            sel = tree.selection()
+            if not sel:
+                return
+            i = int(sel[0])
+            if 0 <= i < len(cond_copy["items"]):
+                ipath = cond_copy["items"][i].get("icon_path", "")
+                if ipath and os.path.exists(ipath):
+                    os.startfile(ipath)
+                else:
+                    messagebox.showwarning("Icono no encontrado",
+                        f"El archivo no existe:\n{ipath}")
+
+        ttk.Button(btn_frame, text="👁️ Ver", command=_preview_icon,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+
+        # ── Reintentos ──
+        retry_frame = ttk.LabelFrame(dlg, text="⏳ Reintentos", padding=5)
+        retry_frame.pack(fill=tk.X, padx=8, pady=(8, 0))
+
+        retry_enabled_var = tk.BooleanVar(value=cond_copy["retry"]["enabled"])
+        retry_count_var = tk.IntVar(value=cond_copy["retry"]["count"])
+        retry_delay_var = tk.IntVar(value=cond_copy["retry"]["delay"])
+
+        retry_row = ttk.Frame(retry_frame)
+        retry_row.pack(fill=tk.X)
+        ttk.Checkbutton(retry_row, text="Reintentar si no se cumple",
+                        variable=retry_enabled_var).pack(side=tk.LEFT)
+        ttk.Label(retry_row, text="  cada").pack(side=tk.LEFT)
+        ttk.Spinbox(retry_row, from_=1, to=60, width=4,
+                    textvariable=retry_delay_var).pack(side=tk.LEFT)
+        ttk.Label(retry_row, text="seg, hasta").pack(side=tk.LEFT)
+        ttk.Spinbox(retry_row, from_=1, to=30, width=4,
+                    textvariable=retry_count_var).pack(side=tk.LEFT)
+        ttk.Label(retry_row, text="veces").pack(side=tk.LEFT)
+
+        # ── Script de recuperación ──
+        fallback_frame = ttk.LabelFrame(dlg, text="🆘 Script de recuperación", padding=5)
+        fallback_frame.pack(fill=tk.X, padx=8, pady=(8, 0))
+
+        fallback_enabled_var = tk.BooleanVar(value=cond_copy["fallback"]["enabled"])
+        fallback_threshold_var = tk.IntVar(value=cond_copy["fallback"]["threshold"])
+        fallback_script_var = tk.StringVar(value=cond_copy["fallback"]["script"])
+
+        fb_row1 = ttk.Frame(fallback_frame)
+        fb_row1.pack(fill=tk.X)
+        ttk.Checkbutton(fb_row1, text="Si falla",
+                        variable=fallback_enabled_var).pack(side=tk.LEFT)
+        ttk.Spinbox(fb_row1, from_=1, to=30, width=4,
+                    textvariable=fallback_threshold_var).pack(side=tk.LEFT)
+        ttk.Label(fb_row1, text="veces seguidas, ejecutar:").pack(side=tk.LEFT)
+
+        fb_row2 = ttk.Frame(fallback_frame)
+        fb_row2.pack(fill=tk.X, pady=(4, 0))
+
+        fb_script_label = ttk.Label(fb_row2, textvariable=fallback_script_var,
+                                    style="Dim.TLabel", width=45, anchor=tk.W)
+        fb_script_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        def _pick_fallback():
+            path = filedialog.askopenfilename(
+                title="Seleccionar script de recuperación",
+                filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")],
+            )
+            if path:
+                fallback_script_var.set(path)
+
+        ttk.Button(fb_row2, text="📂 Elegir", command=_pick_fallback,
+                   style="Compact.TButton").pack(side=tk.RIGHT, padx=(4, 0))
+
         # ── Guardar / Cancelar ──
         bottom = ttk.Frame(dlg)
         bottom.pack(fill=tk.X, **pad)
 
         def _save():
             cond_copy["mode"] = mode_var.get()
+            cond_copy["retry"] = {
+                "enabled": retry_enabled_var.get(),
+                "count": retry_count_var.get(),
+                "delay": retry_delay_var.get(),
+            }
+            cond_copy["fallback"] = {
+                "enabled": fallback_enabled_var.get(),
+                "threshold": fallback_threshold_var.get(),
+                "script": fallback_script_var.get(),
+            }
             item["conditions"] = {
                 "mode": cond_copy["mode"],
                 "items": cond_copy["items"],
+                "retry": cond_copy["retry"],
+                "fallback": cond_copy["fallback"],
             }
             self._refresh_list()
             dlg.destroy()
 
         def _clear_all():
-            if messagebox.askyesno("Limpiar", "¿Eliminar todas las condiciones?"):
+            if messagebox.askyesno("Limpiar", "¿Eliminar todas las condiciones?\n\n"
+                                   "También se borrarán las imágenes capturadas."):
+                for c in cond_copy["items"]:
+                    ipath = c.get("icon_path", "")
+                    if ipath and os.path.exists(ipath):
+                        try:
+                            os.remove(ipath)
+                        except OSError:
+                            pass
                 cond_copy["items"].clear()
                 _refresh_cond_list()
 
@@ -2060,6 +2216,10 @@ class OrchestratorApp:
             "on_error": lambda msg: self.root.after(0, lambda: self._cb_error(msg)),
             "on_launch": lambda path: self.root.after(0, lambda: self._do_launch(path)),
             "on_skip_icon": lambda idx, name: self.root.after(0, lambda: self._cb_skip_icon(idx, name)),
+            "on_retry_wait": lambda idx, name, attempt, total: self.root.after(
+                0, lambda: self._cb_retry_wait(idx, name, attempt, total)),
+            "on_fallback_trigger": lambda idx, name, fb_name: self.root.after(
+                0, lambda: self._cb_fallback_trigger(idx, name, fb_name)),
         }
 
         self.executor_thread = Executor(
@@ -2243,6 +2403,18 @@ class OrchestratorApp:
     def _cb_skip_icon(self, idx, name):
         """Called when a script is skipped because its required icon is not visible."""
         self._set_status(f"⏭️  Icono no visible: {name}", DARK_COLORS["yellow"])
+
+    def _cb_retry_wait(self, idx, name, attempt, total):
+        """Called when waiting between retry attempts."""
+        self._set_status(
+            f"⏳ Reintento {attempt}/{total} para: {name}",
+            DARK_COLORS["yellow"])
+
+    def _cb_fallback_trigger(self, idx, name, fb_name):
+        """Called when fallback script is triggered after consecutive failures."""
+        self._set_status(
+            f"🆘 Recuperación ejecutada: {fb_name} (falló {name})",
+            DARK_COLORS["red"])
 
     def _cb_error(self, msg):
         self._dark_dialog("Error", msg, "error")

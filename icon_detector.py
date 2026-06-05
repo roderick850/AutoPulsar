@@ -19,8 +19,12 @@ except ImportError:
 
 def _find_subimage(screenshot, icon, threshold=0.05):
     """Busca `icon` dentro de `screenshot`. Retorna (x, y) o None.
-    
-    Usa comparación por diferencia media de píxeles.
+
+    Algoritmo en dos fases:
+    1. Búsqueda gruesa (paso grande) → candidato aproximado
+    2. Refinamiento fino (±step alrededor del candidato, paso=1)
+       → posición exacta
+
     threshold: 0.0 = match perfecto, 0.05 = 5% de tolerancia.
     """
     sw, sh = screenshot.size
@@ -36,29 +40,63 @@ def _find_subimage(screenshot, icon, threshold=0.05):
     screen_pixels = screen_rgb.load()
     icon_pixels = icon_rgb.load()
 
-    total_icon_pixels = iw * ih
+    step = max(1, min(iw, ih) // 4)
+
+    # ── Fase 1: búsqueda gruesa ──
     min_diff = float("inf")
     best_pos = None
-
-    # Buscar en pasos de 2 píxeles para velocidad (luego refina)
-    step = max(1, min(iw, ih) // 4)
 
     for y in range(0, sh - ih + 1, step):
         for x in range(0, sw - iw + 1, step):
             diff = 0
-            # Muestrear cada step píxeles
+            samples = 0
             for iy in range(0, ih, step):
                 for ix in range(0, iw, step):
                     try:
                         sp = screen_pixels[x + ix, y + iy]
                         ip = icon_pixels[ix, iy]
                         diff += abs(sp[0] - ip[0]) + abs(sp[1] - ip[1]) + abs(sp[2] - ip[2])
+                        samples += 1
                     except IndexError:
                         pass
 
-            samples = (ih // step) * (iw // step)
             if samples == 0:
-                samples = 1
+                continue
+            avg_diff = diff / (samples * 3 * 255)
+
+            if avg_diff < min_diff:
+                min_diff = avg_diff
+                best_pos = (x, y)
+
+    if best_pos is None:
+        return None
+
+    # ── Fase 2: refinamiento alrededor del mejor candidato ──
+    bx, by = best_pos
+    x_start = max(0, bx - step)
+    y_start = max(0, by - step)
+    x_end = min(sw - iw, bx + step)
+    y_end = min(sh - ih, by + step)
+
+    # Muestreo más fino para la fase de refinamiento
+    fine_sample = max(1, min(iw, ih) // 8)
+
+    for y in range(y_start, y_end + 1):
+        for x in range(x_start, x_end + 1):
+            diff = 0
+            samples = 0
+            for iy in range(0, ih, fine_sample):
+                for ix in range(0, iw, fine_sample):
+                    try:
+                        sp = screen_pixels[x + ix, y + iy]
+                        ip = icon_pixels[ix, iy]
+                        diff += abs(sp[0] - ip[0]) + abs(sp[1] - ip[1]) + abs(sp[2] - ip[2])
+                        samples += 1
+                    except IndexError:
+                        pass
+
+            if samples == 0:
+                continue
             avg_diff = diff / (samples * 3 * 255)
 
             if avg_diff < min_diff:
