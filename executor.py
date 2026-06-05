@@ -75,79 +75,30 @@ class Executor(threading.Thread):
                 if current_loop > 1 and item.get("first_loop_only", False):
                     continue
 
-                # Check conditions — with retry + fallback
-                conditions = item.get("conditions", {})
-                if conditions and conditions.get("items") and HAS_ICON_DETECTOR:
-                    retry_cfg = conditions.get("retry", {})
-                    retry_enabled = retry_cfg.get("enabled", False)
-                    retry_count = retry_cfg.get("count", 1) if retry_enabled else 1
-                    retry_delay = retry_cfg.get("delay", 3) if retry_enabled else 0
-
-                    cond_met = False
-                    fail_reason = ""
-                    for attempt in range(retry_count):
-                        if self.stop_event.is_set():
-                            break
-                        ok, reason = check_conditions(conditions)
-                        if ok:
-                            cond_met = True
-                            break
-                        fail_reason = reason or "condiciones no cumplidas"
-                        if attempt < retry_count - 1 and retry_delay > 0:
-                            self._safe_callback("on_retry_wait", idx,
-                                os.path.basename(item["path"]), attempt + 1, retry_count)
-                            slept = 0.0
-                            while slept < retry_delay and not self.stop_event.is_set():
-                                time.sleep(0.1)
-                                slept += 0.1
-
-                    if not cond_met:
-                        # Track consecutive failures for fallback
-                        item["_consecutive_failures"] = item.get("_consecutive_failures", 0) + 1
-
-                        fallback_cfg = conditions.get("fallback", {})
-                        if fallback_cfg.get("enabled", False):
-                            threshold = fallback_cfg.get("threshold", 3)
-                            fallback_script = fallback_cfg.get("script", "")
-                            if item["_consecutive_failures"] >= threshold and fallback_script:
-                                self._safe_callback("on_fallback_trigger", idx,
-                                    os.path.basename(item["path"]),
-                                    os.path.basename(fallback_script))
-                                try:
-                                    # Lanzar en background — no esperar a que termine
-                                    subprocess.Popen(fallback_script, shell=True)
-                                except Exception as e:
-                                    self._safe_callback("on_fallback_error",
-                                        os.path.basename(fallback_script), str(e))
-                                item["_consecutive_failures"] = 0  # reset after fallback
-
-                                # Delay post-fallback antes de continuar
-                                fb_delay = fallback_cfg.get("delay_after", 0)
-                                if fb_delay > 0:
-                                    self._safe_callback("on_fallback_wait", idx,
-                                        os.path.basename(item["path"]), fb_delay)
-                                    slept = 0.0
-                                    while slept < fb_delay and not self.stop_event.is_set():
-                                        time.sleep(0.1)
-                                        slept += 0.1
-
-                        self._safe_callback("on_skip_icon", idx,
-                            os.path.basename(item["path"]))
-                        continue
-                    else:
-                        # Reset failure counter on success
-                        item["_consecutive_failures"] = 0
-
                 name = os.path.basename(item["path"])
                 reps = item["repetitions"]
                 duration = item["duration"]
                 pause = item["pause"]
+                conditions = item.get("conditions", {})
+                has_conditions = bool(conditions and conditions.get("items") and HAS_ICON_DETECTOR)
 
                 self._safe_callback("on_start_item", idx, name, reps)
 
                 for r in range(reps):
                     if self.stop_event.is_set():
                         break
+
+                    # ── Verificar condiciones ANTES de cada repetición ──
+                    if has_conditions:
+                        ok = self._check_conditions_with_retry(
+                            conditions, idx, item)
+                        if not ok:
+                            # Condición falló → script de recuperación ejecutado
+                            # o simplemente saltado. Detener repeticiones.
+                            break  # salir del for de reps, pasar al siguiente script
+                        else:
+                            # Condición cumplida → resetear contador de fallos
+                            item["_consecutive_failures"] = 0
 
                     self._safe_callback(
                         "on_repeat",
@@ -216,6 +167,69 @@ class Executor(threading.Thread):
             current_loop,
             max_loops,
         )
+
+    def _check_conditions_with_retry(self, conditions, idx, item):
+        """Verifica condiciones con reintentos + fallback.
+        
+        Retorna True si las condiciones se cumplen (script debe ejecutarse).
+        Retorna False si fallan (saltar esta repetición/script).
+        """
+        retry_cfg = conditions.get("retry", {})
+        retry_enabled = retry_cfg.get("enabled", False)
+        retry_count = retry_cfg.get("count", 1) if retry_enabled else 1
+        retry_delay = retry_cfg.get("delay", 3) if retry_enabled else 0
+
+        cond_met = False
+        for attempt in range(retry_count):
+            if self.stop_event.is_set():
+                return False
+            ok, reason = check_conditions(conditions)
+            if ok:
+                cond_met = True
+                break
+            if attempt < retry_count - 1 and retry_delay > 0:
+                self._safe_callback("on_retry_wait", idx,
+                    os.path.basename(item["path"]), attempt + 1, retry_count)
+                slept = 0.0
+                while slept < retry_delay and not self.stop_event.is_set():
+                    time.sleep(0.1)
+                    slept += 0.1
+
+        if not cond_met:
+            # Track consecutive failures for fallback
+            item["_consecutive_failures"] = item.get("_consecutive_failures", 0) + 1
+
+            fallback_cfg = conditions.get("fallback", {})
+            if fallback_cfg.get("enabled", False):
+                threshold = fallback_cfg.get("threshold", 3)
+                fallback_script = fallback_cfg.get("script", "")
+                if item["_consecutive_failures"] >= threshold and fallback_script:
+                    self._safe_callback("on_fallback_trigger", idx,
+                        os.path.basename(item["path"]),
+                        os.path.basename(fallback_script))
+                    try:
+                        # Lanzar en background — no esperar a que termine
+                        subprocess.Popen(fallback_script, shell=True)
+                    except Exception as e:
+                        self._safe_callback("on_fallback_error",
+                            os.path.basename(fallback_script), str(e))
+                    item["_consecutive_failures"] = 0  # reset after fallback
+
+                    # Delay post-fallback antes de continuar
+                    fb_delay = fallback_cfg.get("delay_after", 0)
+                    if fb_delay > 0:
+                        self._safe_callback("on_fallback_wait", idx,
+                            os.path.basename(item["path"]), fb_delay)
+                        slept = 0.0
+                        while slept < fb_delay and not self.stop_event.is_set():
+                            time.sleep(0.1)
+                            slept += 0.1
+
+            self._safe_callback("on_skip_icon", idx,
+                os.path.basename(item["path"]))
+            return False
+
+        return True
 
     def _safe_callback(self, name, *args):
         cb = self.callbacks.get(name)
