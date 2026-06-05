@@ -24,25 +24,25 @@ def format_time(seconds):
     return f"{s}s"
 
 
-# ── Dark Theme Colors ──────────────────────────────────────────────
+# ── Dark Theme Colors (synced with CTk "dark-blue" palette) ──────
 DARK_COLORS = {
-    "bg":           "#1e1e2e",   # main background
-    "surface":      "#282840",   # frames, cards
-    "surface_alt":  "#313148",   # alternate surface (treeview rows)
-    "border":       "#3b3b56",   # subtle borders
-    "text":         "#cdd6f4",   # primary text
-    "text_dim":     "#8b8da8",   # secondary text
-    "accent":       "#7c7cf8",   # buttons, highlights
-    "accent_hover": "#9696ff",   # hover state
-    "green":        "#5cce8e",   # success / ready
-    "green_dim":    "#3a8a5e",   # darker green
-    "red":          "#e06070",   # stop / error
-    "yellow":       "#e0b860",   # warning
-    "blue":         "#6090e0",   # running
-    "purple":       "#b090e0",   # waiting
-    "menu_bg":      "#252538",   # menu bar background
-    "menu_fg":      "#cdd6f4",   # menu bar text
-    "menu_active":  "#3b3b56",   # menu hover
+    "bg":           "#1a1a1a",   # main window bg
+    "surface":      "#242424",   # CTkFrame fg_color
+    "surface_alt":  "#2d2d2d",   # Treeview row bg
+    "border":       "#474747",   # subtle borders
+    "text":         "#d6d6d6",   # primary text
+    "text_dim":     "#8a8a8a",   # secondary text
+    "accent":       "#1f538d",   # CTkButton blue
+    "accent_hover": "#14375e",   # button hover
+    "green":        "#2e8b57",   # success / ready
+    "green_dim":    "#1e6b3e",   # darker green
+    "red":          "#c44545",   # stop / error
+    "yellow":       "#c4a43d",   # warning
+    "blue":         "#3a7ebf",   # running
+    "purple":       "#7c5cbf",   # waiting
+    "menu_bg":      "#1a1a1a",   # menu bar background
+    "menu_fg":      "#d6d6d6",   # menu bar text
+    "menu_active":  "#333333",   # menu hover
 }
 
 
@@ -60,8 +60,7 @@ def _apply_dark_titlebar(toplevel, retries=5):
                 hwnd,
                 DWMWA_USE_IMMERSIVE_DARK_MODE,
                 ctypes.byref(ctypes.c_int(1)),
-                ctypes.sizeof(ctypes.c_int(1)),
-            )
+                ctypes.sizeof(ctypes.c_int(1)))
             # Force redraw
             ctypes.windll.user32.SetWindowPos(
                 hwnd, 0, 0, 0, 0, 0,
@@ -80,8 +79,7 @@ def _apply_dark_titlebar(toplevel, retries=5):
                 ctypes.windll.dwmapi.DwmSetWindowAttribute(
                     hwnd2, attr,
                     ctypes.byref(ctypes.c_int(1)),
-                    ctypes.sizeof(ctypes.c_int(1)),
-                )
+                    ctypes.sizeof(ctypes.c_int(1)))
             except Exception:
                 pass
     except Exception:
@@ -168,15 +166,13 @@ class OrchestratorApp:
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
             font=("Segoe UI", 9), borderwidth=0,
-            padx=6, pady=3, cursor="hand2",
-        )
+            padx=6, pady=3, cursor="hand2")
         file_mb.pack(side=tk.LEFT)
         file_menu = tk.Menu(
             file_mb, tearoff=0,
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
-            font=("Segoe UI", 9), borderwidth=1, relief="solid",
-        )
+            font=("Segoe UI", 9), borderwidth=1, relief="solid")
         file_menu.add_command(label="💾 Guardar playlist", command=self._menu_save,
                               accelerator="Ctrl+S")
         file_menu.add_separator(background=c["border"])
@@ -189,22 +185,19 @@ class OrchestratorApp:
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
             font=("Segoe UI", 9), borderwidth=0,
-            padx=6, pady=3, cursor="hand2",
-        )
+            padx=6, pady=3, cursor="hand2")
         view_mb.pack(side=tk.LEFT)
         view_menu = tk.Menu(
             view_mb, tearoff=0,
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
-            font=("Segoe UI", 9), borderwidth=1, relief="solid",
-        )
+            font=("Segoe UI", 9), borderwidth=1, relief="solid")
         self._mini_bar_var = tk.BooleanVar(value=self._mini_bar_enabled)
         view_menu.add_checkbutton(
             label="📊 Mini Bar siempre visible",
             variable=self._mini_bar_var,
             command=self._toggle_mini_bar,
-            selectcolor=c["surface_alt"],
-        )
+            selectcolor=c["surface_alt"])
         view_menu.add_separator(background=c["border"])
         view_menu.add_command(label="🗟️ Restaurar tamaño", command=self._menu_reset_size)
         view_mb.config(menu=view_menu)
@@ -215,15 +208,13 @@ class OrchestratorApp:
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
             font=("Segoe UI", 9), borderwidth=0,
-            padx=6, pady=3, cursor="hand2",
-        )
+            padx=6, pady=3, cursor="hand2")
         help_mb.pack(side=tk.LEFT)
         help_menu = tk.Menu(
             help_mb, tearoff=0,
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
-            font=("Segoe UI", 9), borderwidth=1, relief="solid",
-        )
+            font=("Segoe UI", 9), borderwidth=1, relief="solid")
         help_menu.add_command(label="ℹ️ Acerca de TinyTask Orchestrator",
                               command=self._menu_about)
         help_mb.config(menu=help_menu)
@@ -294,35 +285,30 @@ class OrchestratorApp:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
 
-        DARK_COLORS.update({
-            "bg": "#1a1a2e",
-            "surface": "#21213b",
-            "surface_alt": "#2b2b4a",
-            "border": "#3b3b5c",
-            "text": "#dcdcf0",
-            "text_dim": "#8b8d9e",
-            "accent": "#3a7ebf",
-            "accent_hover": "#4a8ecf",
-            "green": "#5cce8e",
-            "red": "#e06070",
-            "yellow": "#e0b860",
-            "blue": "#6090e0",
-            "purple": "#b090e0",
-            "menu_bg": "#1a1a2e",
-            "menu_fg": "#dcdcf0",
-            "menu_active": "#3b3b5c",
-        })
+        # ── CustomTkinter global widget defaults ──
+        # CTk usa su propio tema; solo ajustamos corner_radius global
+        try:
+            # Aplicar corner_radius default a todos los CTkFrames
+            from customtkinter import ThemeManager
+            ThemeManager.theme["CTkFrame"]["corner_radius"] = 6
+            ThemeManager.theme["CTkButton"]["corner_radius"] = 6
+            ThemeManager.theme["CTkEntry"]["corner_radius"] = 4
+            ThemeManager.theme["CTkButton"]["border_width"] = 1
+            ThemeManager.theme["CTkButton"]["border_color"] = ["#3a7ebf80", "#1f538d80"]
+        except Exception:
+            pass
 
         c = DARK_COLORS
         style = ttk.Style()
 
-        # ── Treeview (sigue siendo ttk) ──
+        # ── Treeview (sigue siendo ttk, colores sincronizados) ──
         style.configure("Treeview",
                         background=c["surface_alt"], foreground=c["text"],
                         fieldbackground=c["surface_alt"], borderwidth=0)
         style.configure("Treeview.Heading",
                         background=c["surface"], foreground=c["text"],
-                        borderwidth=1, bordercolor=c["border"], padding=4)
+                        borderwidth=1, bordercolor=c["border"], padding=4,
+                        font=("Segoe UI", 9, "bold"))
         style.map("Treeview.Heading",
                   background=[("active", c["accent"])],
                   foreground=[("active", "#ffffff")])
@@ -335,25 +321,28 @@ class OrchestratorApp:
                         troughcolor=c["bg"], bordercolor=c["bg"],
                         arrowcolor=c["text_dim"], borderwidth=0)
 
-        # ── LabelFrame (ttk) ──
+        # ── LabelFrame (ttk, se usa en editor de condiciones) ──
         style.configure("TLabelframe", background=c["bg"], foreground=c["text"],
                         bordercolor=c["border"], borderwidth=1)
-        style.configure("TLabelframe.Label", background=c["bg"], foreground=c["text"])
+        style.configure("TLabelframe.Label", background=c["bg"], foreground=c["text"],
+                        font=("Segoe UI", 9, "bold"))
 
         # ── Combobox / Spinbox (ttk) ──
-        style.configure("TCombobox", fieldbackground=c["surface"], foreground=c["text"],
-                        background=c["surface"], arrowcolor=c["text"],
-                        bordercolor=c["border"])
+        style.configure("TCombobox", fieldbackground=c["surface_alt"],
+                        foreground=c["text"], background=c["surface_alt"],
+                        arrowcolor=c["text"], bordercolor=c["border"])
         style.map("TCombobox",
-                  fieldbackground=[("readonly", c["surface"])],
+                  fieldbackground=[("readonly", c["surface_alt"])],
                   foreground=[("readonly", c["text"])])
-        style.configure("TSpinbox", fieldbackground=c["surface"], foreground=c["text"],
-                        bordercolor=c["border"], borderwidth=1, arrowcolor=c["text"])
+        style.configure("TSpinbox", fieldbackground=c["surface_alt"],
+                        foreground=c["text"], bordercolor=c["border"],
+                        borderwidth=1, arrowcolor=c["text"])
 
-        # Estilos compactos para ttk fallback
+        # ── Compact styles (para ttk fallback) ──
         style.configure("Compact.TButton", padding=4, font=("Segoe UI", 9))
-        style.configure("Dim.TLabel", foreground=c["text_dim"])
+        style.configure("Dim.TLabel", foreground=c["text_dim"], background=c["bg"])
         style.configure("TLabel", background=c["bg"], foreground=c["text"])
+        style.configure("TFrame", background=c["bg"])
 
     def _build_ui(self):
         c = DARK_COLORS
@@ -369,8 +358,7 @@ class OrchestratorApp:
             textvariable=self.loop_mode_var,
             values=["once", "fixed", "infinite"],
             width=10,
-            state="readonly",
-        )
+            state="readonly")
         mode_combo.pack(side=tk.LEFT, padx=2)
         mode_combo.bind("<<ComboboxSelected>>", self._on_loop_mode_change)
 
@@ -399,8 +387,7 @@ class OrchestratorApp:
 
         columns = ("orden", "hab", "primero", "icono", "nombre", "reps", "duracion", "pausa", "tiempo")
         self.tree = ttk.Treeview(
-            list_frame, columns=columns, show="tree headings", selectmode="extended",
-        )
+            list_frame, columns=columns, show="tree headings", selectmode="extended")
         # Column #0 = tree column (expander arrows for groups)
         self.tree.column("#0", width=30, minwidth=24, stretch=False, anchor="w")
         self.tree.heading("#0", text="")
@@ -496,8 +483,7 @@ class OrchestratorApp:
             font=("Segoe UI", 9, "bold"),
             text_color="#ffffff",
             fg_color=c["green"],
-            corner_radius=4,
-        )
+            corner_radius=4)
         self.status_label.pack(anchor=tk.W, pady=(0, 3))
 
         # Progress bar + percentage label
@@ -531,8 +517,7 @@ class OrchestratorApp:
             textvariable=self.hotkey_var,
             values=["F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
             width=4,
-            state="readonly",
-        )
+            state="readonly")
         hotkey_combo.pack(side=tk.LEFT, padx=2)
         ttk.Label(exec_frame, text="(solo ▶ Iniciar todo / ⏹ Detener)", style="Dim.TLabel").pack(side=tk.LEFT, padx=(3, 0))
         hotkey_combo.bind("<<ComboboxSelected>>", self._on_hotkey_change)
@@ -684,18 +669,15 @@ class OrchestratorApp:
         self.tree.tag_configure("group_row",
             font=("Segoe UI", 9, "bold"),
             background="#1a3048",  # azul más intenso para headers de grupo
-            foreground="#cdd6f4",
-        )
+            foreground="#cdd6f4")
         self.tree.tag_configure("script_grouped",
             font=("Segoe UI", 9),
             background="#1e2a3a",  # azul oscuro — contraste claro con surface
-            foreground=DARK_COLORS["text"],
-        )
+            foreground=DARK_COLORS["text"])
         self.tree.tag_configure("script_ungrouped",
             font=("Segoe UI", 9),
             background=DARK_COLORS["surface"],
-            foreground=DARK_COLORS["text"],
-        )
+            foreground=DARK_COLORS["text"])
 
         # group_nodes: {group_path: treeview_iid}
         group_nodes = {}
@@ -724,9 +706,8 @@ class OrchestratorApp:
                             parent_iid, tk.END,
                             text=" ",  # columna árbol necesita contenido para jerarquía
                             values=("", "", "", "", f"{group_indent}📁 {part}", "", "", "", ""),
-                            tags=("group_row",),
-                            open=old_open_state.get(current_path, True),
-                        )
+                            tags=("group_row"),
+                            open=old_open_state.get(current_path, True))
                         group_nodes[current_path] = group_iid
                         self._item_map[group_iid] = ("group", current_path)
                     parent_iid = group_nodes[current_path]
@@ -740,8 +721,7 @@ class OrchestratorApp:
                     values=(idx + 1, check, primero, cond_text, f"{indent}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
-                    tags=("script_grouped",),
-                )
+                    tags=("script_grouped"))
             else:
                 # Ungrouped — default surface background
                 script_iid = self.tree.insert(
@@ -750,8 +730,7 @@ class OrchestratorApp:
                     values=(idx + 1, check, primero, cond_text, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
-                    tags=("script_ungrouped",),
-                )
+                    tags=("script_ungrouped"))
             self._item_map[script_iid] = ("script", idx)
 
         # ── Update group rows with enabled/primero summary ──
@@ -1428,8 +1407,7 @@ class OrchestratorApp:
         def _pick_fallback():
             path = filedialog.askopenfilename(
                 title="Seleccionar script de recuperación",
-                filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")],
-            )
+                filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")])
             if path:
                 fallback_script_var.set(path)
 
@@ -1494,8 +1472,7 @@ class OrchestratorApp:
     def _add_script(self):
         path = filedialog.askopenfilename(
             title="Seleccionar script TinyTask",
-            filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")],
-        )
+            filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")])
         if not path:
             return
 
@@ -1704,8 +1681,7 @@ class OrchestratorApp:
                     # Same group — simple swap
                     self.playlist[idx], self.playlist[idx - 1] = (
                         self.playlist[idx - 1],
-                        self.playlist[idx],
-                    )
+                        self.playlist[idx])
                     self._refresh_list()
                     self._reselect_script(idx - 1)
                 else:
@@ -1733,8 +1709,7 @@ class OrchestratorApp:
                     # Same group — simple swap
                     self.playlist[idx], self.playlist[idx + 1] = (
                         self.playlist[idx + 1],
-                        self.playlist[idx],
-                    )
+                        self.playlist[idx])
                     self._refresh_list()
                     self._reselect_script(idx + 1)
                 else:
@@ -2178,8 +2153,7 @@ class OrchestratorApp:
                 0,
                 lambda: self._cb_repeat(
                     global_rep, total_global, total_per_loop, name, current, total_item, loop, max_loops
-                ),
-            ),
+                )),
             "on_loop_delay": lambda current, delay, total_global: self.root.after(
                 0, lambda: self._cb_loop_delay(current, delay, total_global)
             ),
@@ -2261,8 +2235,7 @@ class OrchestratorApp:
                     prog,
                     self._exec_total_time,
                     f"-{mini_format_time(int(remaining))}",
-                    True,
-                )
+                    True)
         else:
             # Infinite mode: show script countdown + total session elapsed
             elapsed = time.time() - self._exec_start_time
@@ -2280,8 +2253,7 @@ class OrchestratorApp:
                     prog_val,
                     prog_max,
                     time_text,
-                    True,
-                )
+                    True)
         self.root.after(500, self._poll_timer)
 
     def _cb_start_run(self, total_global, total_per_loop, max_loops):
