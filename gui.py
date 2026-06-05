@@ -309,7 +309,8 @@ class OrchestratorApp:
         c = DARK_COLORS
 
         # ===== Frame Configuración del Loop (compacto) =====
-        loop_frame = ttk.LabelFrame(self.root, text=" Loop ", padding=5)
+        loop_frame = ttk.LabelFrame(self.root, text=" Loop ")
+        loop_frame.configure(padding=5)
         loop_frame.pack(fill=tk.X, padx=5, pady=(5, 3))
 
         ttk.Label(loop_frame, text="Modo:", style="Compact.TLabel").pack(side=tk.LEFT, padx=(0, 3))
@@ -436,7 +437,8 @@ class OrchestratorApp:
         )
 
         # ===== Frame ejecución (compacto) =====
-        exec_frame = ttk.LabelFrame(self.root, text=" Ejecución ", padding=5)
+        exec_frame = ttk.LabelFrame(self.root, text=" Ejecución ")
+        exec_frame.configure(padding=5)
         exec_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
 
         # Status visual con colores sobre fondo oscuro
@@ -1029,7 +1031,8 @@ class OrchestratorApp:
         dlg.grab_set()
         dlg.lift()
 
-        frame = ttk.Frame(dlg, padding=15)
+        frame = ttk.Frame(dlg)
+        frame.configure(padding=15)
         frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frame, text=message, style="Bold.TLabel",
@@ -1333,7 +1336,8 @@ class OrchestratorApp:
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
         # ── Reintentos ──
-        retry_frame = ttk.LabelFrame(dlg, text="⏳ Reintentos", padding=5)
+        retry_frame = ttk.LabelFrame(dlg, text="⏳ Reintentos")
+        retry_frame.configure(padding=5)
         retry_frame.pack(fill=tk.X, padx=8, pady=(8, 0))
 
         retry_enabled_var = tk.BooleanVar(value=cond_copy["retry"]["enabled"])
@@ -1353,7 +1357,8 @@ class OrchestratorApp:
         ttk.Label(retry_row, text="veces").pack(side=tk.LEFT)
 
         # ── Script de recuperación ──
-        fallback_frame = ttk.LabelFrame(dlg, text="🆘 Script de recuperación", padding=5)
+        fallback_frame = ttk.LabelFrame(dlg, text="🆘 Script de recuperación")
+        fallback_frame.configure(padding=5)
         fallback_frame.pack(fill=tk.X, padx=8, pady=(8, 0))
 
         fallback_enabled_var = tk.BooleanVar(value=cond_copy["fallback"]["enabled"])
@@ -1463,7 +1468,8 @@ class OrchestratorApp:
         dw, dh = win.winfo_width(), win.winfo_height()
         win.geometry(f"300x260+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
-        form = ttk.Frame(win, padding=10)
+        form = ttk.Frame(win)
+        form.configure(padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(form, text=f"Script: {os.path.basename(path)}", style="Dim.TLabel").pack(pady=(0, 10))
@@ -1545,7 +1551,8 @@ class OrchestratorApp:
         dw, dh = win.winfo_width(), win.winfo_height()
         win.geometry(f"300x280+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
-        form = ttk.Frame(win, padding=10)
+        form = ttk.Frame(win)
+        form.configure(padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(form, text=f"Script: {os.path.basename(item['path'])}", style="Dim.TLabel").pack(pady=(0, 10))
@@ -2009,7 +2016,8 @@ class OrchestratorApp:
         dw, dh = win.winfo_width(), win.winfo_height()
         win.geometry(f"300x130+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
-        form = ttk.Frame(win, padding=10)
+        form = ttk.Frame(win)
+        form.configure(padding=10)
         form.pack(fill=tk.BOTH, expand=True)
 
         # Support multi-line labels
