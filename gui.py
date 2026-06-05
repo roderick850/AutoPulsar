@@ -494,10 +494,9 @@ class OrchestratorApp:
             exec_frame,
             text=" LISTO ",
             font=("Segoe UI", 9, "bold"),
-            fg="#ffffff",
-            bg=c["green"],
-            padx=8,
-            pady=2,
+            text_color="#ffffff",
+            fg_color=c["green"],
+            corner_radius=4,
         )
         self.status_label.pack(anchor=tk.W, pady=(0, 3))
 
@@ -1337,7 +1336,7 @@ class OrchestratorApp:
             i = int(sel[0])
             if 0 <= i < len(cond_copy["items"]):
                 # Simple entry popup
-                lbl_win = ctk.CTkToplevel(dlg, bg=c["bg"])
+                lbl_win = ctk.CTkToplevel(dlg, fg_color=c["bg"])
                 lbl_win.title("Etiqueta")
                 lbl_win.geometry("260x80")
                 lbl_win.transient(dlg)

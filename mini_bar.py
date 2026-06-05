@@ -9,20 +9,19 @@ Al cerrar (X) se oculta; se restaura desde el menú View.
 
 import tkinter as tk
 from tkinter import ttk
-import customtkinter as ctk
 import os
 import ctypes
 
 # ── Dark Theme (mismos colores que la app principal) ──────────────
 DARK_COLORS = {
-    "bg":           "#1a1a2e",
-    "surface":      "#21213b",
-    "surface_alt":  "#2b2b4a",
-    "border":       "#3b3b5c",
-    "text":         "#dcdcf0",
-    "text_dim":     "#8b8d9e",
-    "accent":       "#3a7ebf",
-    "accent_hover": "#4a8ecf",
+    "bg":           "#1e1e2e",
+    "surface":      "#282840",
+    "surface_alt":  "#313148",
+    "border":       "#3b3b56",
+    "text":         "#cdd6f4",
+    "text_dim":     "#8b8da8",
+    "accent":       "#7c7cf8",
+    "accent_hover": "#9696ff",
     "green":        "#5cce8e",
     "red":          "#e06070",
     "yellow":       "#e0b860",
@@ -141,12 +140,12 @@ class MiniBar:
     def _build_ui(self, pinned):
         c = DARK_COLORS
 
-        bar = ctk.CTkFrame(self.root, bg=c["bg"], height=30)
+        bar = tk.Frame(self.root, bg=c["bg"], height=30)
         bar.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
         bar.pack_propagate(False)
 
         # ── Paso actual (label que se trunca automáticamente) ──
-        self.step_label = ctk.CTkLabel(
+        self.step_label = tk.Label(
             bar, text="Listo",
             fg=c["text"], bg=c["bg"],
             font=("Segoe UI", 9),
@@ -159,14 +158,14 @@ class MiniBar:
         style.configure("Mini.Horizontal.TProgressbar",
                         background=c["green"], troughcolor=c["surface_alt"],
                         borderwidth=0, thickness=6)
-        self.progress = ctk.CTkProgressBar(
+        self.progress = ttk.Progressbar(
             bar, orient=tk.HORIZONTAL, mode="determinate",
             style="Mini.Horizontal.TProgressbar", length=70,
         )
         self.progress.pack(side=tk.LEFT, padx=2)
 
         # ── Tiempo (script countdown | total sesión) ──
-        self.time_label = ctk.CTkLabel(
+        self.time_label = tk.Label(
             bar, text="--:--",
             fg=c["text_dim"], bg=c["bg"],
             font=("Segoe UI", 8),
@@ -175,7 +174,7 @@ class MiniBar:
         self.time_label.pack(side=tk.LEFT, padx=3)
 
         # ── Botón Detener ──
-        self.stop_btn = ctk.CTkButton(
+        self.stop_btn = tk.Button(
             bar, text="⏹", command=self._on_stop,
             bg=c["surface_alt"], fg=c["text_dim"],
             font=("Segoe UI", 10, "bold"),
@@ -188,7 +187,7 @@ class MiniBar:
 
         # ── Botón Pin (always-on-top toggle) ──
         self._pinned = pinned
-        self.pin_btn = ctk.CTkButton(
+        self.pin_btn = tk.Button(
             bar, text="📌", command=self._toggle_pin,
             bg=c["surface"] if pinned else c["bg"],
             fg=c["text"] if pinned else c["text_dim"],
@@ -199,7 +198,7 @@ class MiniBar:
         self.pin_btn.pack(side=tk.LEFT, padx=1)
 
         # ── Botón restaurar ventana principal ──
-        self.restore_btn = ctk.CTkButton(
+        self.restore_btn = tk.Button(
             bar, text="⬆", command=self._restore_main,
             bg=c["surface"], fg=c["text_dim"],
             font=("Segoe UI", 8),
