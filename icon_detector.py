@@ -8,6 +8,7 @@ Modos:
 """
 
 import time
+import os
 from PIL import Image
 
 try:
@@ -17,7 +18,7 @@ except ImportError:
     HAS_MSS = False
 
 
-def _find_subimage(screenshot, icon, threshold=0.05):
+def _find_subimage(screenshot, icon, threshold=0.08):
     """Busca `icon` dentro de `screenshot`. Retorna (x, y) o None.
 
     Algoritmo en dos fases:
@@ -25,7 +26,9 @@ def _find_subimage(screenshot, icon, threshold=0.05):
     2. Refinamiento fino (±step alrededor del candidato, paso=1)
        → posición exacta
 
-    threshold: 0.0 = match perfecto, 0.05 = 5% de tolerancia.
+    threshold: 0.0 = match perfecto, 0.08 = 8% de tolerancia (más
+    permisivo para manejar diferencias de renderizado entre captura
+    y ejecución).
     """
     sw, sh = screenshot.size
     iw, ih = icon.size
@@ -40,7 +43,8 @@ def _find_subimage(screenshot, icon, threshold=0.05):
     screen_pixels = screen_rgb.load()
     icon_pixels = icon_rgb.load()
 
-    step = max(1, min(iw, ih) // 4)
+    # Paso adaptativo: más fino para iconos pequeños
+    step = max(1, min(iw, ih) // 6)
 
     # ── Fase 1: búsqueda gruesa ──
     min_diff = float("inf")
@@ -79,7 +83,7 @@ def _find_subimage(screenshot, icon, threshold=0.05):
     y_end = min(sh - ih, by + step)
 
     # Muestreo más fino para la fase de refinamiento
-    fine_sample = max(1, min(iw, ih) // 8)
+    fine_sample = max(1, min(iw, ih) // 12)
 
     for y in range(y_start, y_end + 1):
         for x in range(x_start, x_end + 1):
@@ -108,7 +112,7 @@ def _find_subimage(screenshot, icon, threshold=0.05):
     return None
 
 
-def check_icon(icon_path, region=None, threshold=0.05):
+def check_icon(icon_path, region=None, threshold=0.08):
     """Verifica si el icono en `icon_path` está visible en pantalla.
     
     Args:
@@ -117,12 +121,18 @@ def check_icon(icon_path, region=None, threshold=0.05):
         threshold: 0.0-1.0, qué tan estricta es la comparación
     
     Returns:
-        True si el icono fue encontrado, False si no.
+        (found, error_msg)
+        - (True, None) si el icono fue encontrado
+        - (False, "missing") si el archivo no existe
+        - (False, "not_found") si el archivo existe pero no se encontró en pantalla
     """
+    if not os.path.exists(icon_path):
+        return False, "missing"
+
     try:
         icon = Image.open(icon_path)
     except Exception:
-        return False  # Icono no válido → no ejecutar
+        return False, "missing"  # archivo corrupto o no válido
 
     if HAS_MSS:
         with mss.mss() as sct:
@@ -137,8 +147,8 @@ def check_icon(icon_path, region=None, threshold=0.05):
                 screenshot = sct.grab(monitor)
                 screenshot = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
                 if _find_subimage(screenshot, icon, threshold):
-                    return True
-            return False
+                    return True, None
+            return False, "not_found"
     else:
         # Fallback: usar ImageGrab (más lento pero funciona sin mss)
         from PIL import ImageGrab
@@ -149,7 +159,9 @@ def check_icon(icon_path, region=None, threshold=0.05):
             screenshot = ImageGrab.grab(all_screens=True)
 
     result = _find_subimage(screenshot, icon, threshold)
-    return result is not None
+    if result is not None:
+        return True, None
+    return False, "not_found"
 
 
 def check_conditions(conditions):
@@ -163,42 +175,62 @@ def check_conditions(conditions):
         ]
     }
     
-    - "require": el icono DEBE estar visible (check_icon → True)
-    - "block":   el icono NO debe estar visible (check_icon → False)
+    - "require": el icono DEBE estar visible
+    - "block":   el icono NO debe estar visible
     - mode "and": TODAS las condiciones deben cumplirse
     - mode "or":  AL MENOS UNA condición debe cumplirse
     
-    Retorna True si el script DEBE ejecutarse.
-    Si no hay condiciones, retorna True.
+    Retorna (should_execute, reason).
+    should_execute: True si el script DEBE ejecutarse.
+    reason: None si ok, o string con la razón del fallo.
+    Si no hay condiciones, retorna (True, None).
     """
     items = conditions.get("items", [])
     if not items:
-        return True
+        return True, None
 
     mode = conditions.get("mode", "and")
     results = []
+    reasons = []
 
     for cond in items:
         icon_path = cond.get("icon_path", "")
         ctype = cond.get("type", "require")
 
         if not icon_path:
-            results.append(True if ctype == "block" else False)
+            # Sin icono: "block" sin icono = no se puede bloquear → pasa
+            # "require" sin icono = no se puede requerir → falla
+            passed = True if ctype == "block" else False
+            results.append(passed)
+            if not passed:
+                reasons.append(f"Requiere icono (sin ruta)")
             continue
 
-        visible = check_icon(icon_path)
+        found, error = check_icon(icon_path)
 
         if ctype == "require":
-            results.append(visible)       # debe estar → True si visible
+            results.append(found)       # debe estar → True si visible
+            if not found:
+                tag = "falta icono" if error == "missing" else "icono no visible"
+                reasons.append(f"Requerir: {tag} ({os.path.basename(icon_path)})")
         elif ctype == "block":
-            results.append(not visible)   # NO debe estar → True si NO visible
+            blocked = not found         # debe NO estar → True si NO visible
+            results.append(blocked)
+            if not blocked:
+                # El icono SÍ está visible → no debería ejecutarse
+                reasons.append(f"Bloquear: icono visible ({os.path.basename(icon_path)})")
         else:
-            results.append(visible)
+            results.append(found)
 
     if mode == "or":
-        return any(results)
+        passed = any(results)
     else:  # "and"
-        return all(results)
+        passed = all(results)
+
+    if passed:
+        return True, None
+    else:
+        return False, "; ".join(reasons) if reasons else "condiciones no cumplidas"
 
 
 # ── Prueba rápida ──
@@ -214,6 +246,7 @@ if __name__ == "__main__":
         region = tuple(map(int, sys.argv[2:6]))
 
     t0 = time.time()
-    found = check_icon(icon, region)
+    found, error = check_icon(icon, region)
     elapsed = time.time() - t0
-    print(f"Encontrado: {found} ({elapsed:.2f}s)")
+    status = "ENCONTRADO" if found else f"NO encontrado ({error})"
+    print(f"{status} ({elapsed:.2f}s)")

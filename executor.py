@@ -84,12 +84,15 @@ class Executor(threading.Thread):
                     retry_delay = retry_cfg.get("delay", 3) if retry_enabled else 0
 
                     cond_met = False
+                    fail_reason = ""
                     for attempt in range(retry_count):
                         if self.stop_event.is_set():
                             break
-                        if check_conditions(conditions):
+                        ok, reason = check_conditions(conditions)
+                        if ok:
                             cond_met = True
                             break
+                        fail_reason = reason or "condiciones no cumplidas"
                         if attempt < retry_count - 1 and retry_delay > 0:
                             self._safe_callback("on_retry_wait", idx,
                                 os.path.basename(item["path"]), attempt + 1, retry_count)
@@ -111,11 +114,27 @@ class Executor(threading.Thread):
                                     os.path.basename(item["path"]),
                                     os.path.basename(fallback_script))
                                 try:
-                                    subprocess.Popen(fallback_script, shell=True)
-                                    time.sleep(1.0)  # brief pause for the fix script to start
+                                    # Esperar a que termine el script de recuperación
+                                    fb_timeout = fallback_cfg.get("timeout", 120)
+                                    subprocess.run(fallback_script, shell=True,
+                                                   timeout=fb_timeout)
+                                except subprocess.TimeoutExpired:
+                                    self._safe_callback("on_error",
+                                        f"Timeout en script de recuperación: {os.path.basename(fallback_script)}")
                                 except Exception as e:
-                                    self._safe_callback("on_error", f"Fallo script de recuperación: {e}")
+                                    self._safe_callback("on_error",
+                                        f"Fallo script de recuperación: {e}")
                                 item["_consecutive_failures"] = 0  # reset after fallback
+
+                                # Delay post-fallback antes de continuar
+                                fb_delay = fallback_cfg.get("delay_after", 0)
+                                if fb_delay > 0:
+                                    self._safe_callback("on_fallback_wait", idx,
+                                        os.path.basename(item["path"]), fb_delay)
+                                    slept = 0.0
+                                    while slept < fb_delay and not self.stop_event.is_set():
+                                        time.sleep(0.1)
+                                        slept += 0.1
 
                         self._safe_callback("on_skip_icon", idx,
                             os.path.basename(item["path"]))
