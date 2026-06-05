@@ -89,13 +89,18 @@ def check_icon(icon_path, region=None, threshold=0.05):
     if HAS_MSS:
         with mss.mss() as sct:
             if region:
-                monitor = {"left": region[0], "top": region[1],
-                           "width": region[2], "height": region[3]}
+                monitors = [{"left": region[0], "top": region[1],
+                            "width": region[2], "height": region[3]}]
             else:
-                monitor = sct.monitors[1]  # Primary monitor
+                # Buscar en TODOS los monitores (índice 1+)
+                monitors = [sct.monitors[i] for i in range(1, len(sct.monitors))]
 
-            screenshot = sct.grab(monitor)
-            screenshot = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            for monitor in monitors:
+                screenshot = sct.grab(monitor)
+                screenshot = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+                if _find_subimage(screenshot, icon, threshold):
+                    return True
+            return False
     else:
         # Fallback: usar ImageGrab (más lento pero funciona sin mss)
         from PIL import ImageGrab
