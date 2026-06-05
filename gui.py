@@ -1148,12 +1148,12 @@ class OrchestratorApp:
             "mode": conditions.get("mode", "and"),
             "items": [dict(c) for c in conditions.get("items", [])],
             "retry": dict(conditions.get("retry", {"enabled": False, "count": 3, "delay": 5})),
-            "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "script": "", "delay_after": 0, "timeout": 120})),
+            "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "script": "", "delay_after": 0})),
         }
 
         dlg = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
-        dlg.geometry("520x600")
+        dlg.geometry("520x560")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
@@ -1443,7 +1443,6 @@ class OrchestratorApp:
         fallback_threshold_var = tk.IntVar(value=cond_copy["fallback"]["threshold"])
         fallback_script_var = tk.StringVar(value=cond_copy["fallback"]["script"])
         fallback_delay_var = tk.IntVar(value=cond_copy["fallback"].get("delay_after", 0))
-        fallback_timeout_var = tk.IntVar(value=cond_copy["fallback"].get("timeout", 120))
 
         fb_row1 = ttk.Frame(fallback_frame)
         fb_row1.pack(fill=tk.X)
@@ -1476,11 +1475,7 @@ class OrchestratorApp:
         ttk.Label(fb_row3, text="Esperar").pack(side=tk.LEFT)
         ttk.Spinbox(fb_row3, from_=0, to=999, width=5,
                     textvariable=fallback_delay_var).pack(side=tk.LEFT, padx=3)
-        ttk.Label(fb_row3, text="s tras recuperación").pack(side=tk.LEFT)
-        ttk.Label(fb_row3, text="  Timeout:").pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Spinbox(fb_row3, from_=10, to=600, width=5,
-                    textvariable=fallback_timeout_var).pack(side=tk.LEFT, padx=3)
-        ttk.Label(fb_row3, text="s").pack(side=tk.LEFT)
+        ttk.Label(fb_row3, text="s tras recuperación antes de continuar").pack(side=tk.LEFT)
 
         # ── Guardar / Cancelar ──
         bottom = ttk.Frame(dlg)
@@ -1498,7 +1493,6 @@ class OrchestratorApp:
                 "threshold": fallback_threshold_var.get(),
                 "script": fallback_script_var.get(),
                 "delay_after": fallback_delay_var.get(),
-                "timeout": fallback_timeout_var.get(),
             }
             item["conditions"] = {
                 "mode": cond_copy["mode"],
@@ -2235,6 +2229,8 @@ class OrchestratorApp:
                 0, lambda: self._cb_fallback_trigger(idx, name, fb_name)),
             "on_fallback_wait": lambda idx, name, delay: self.root.after(
                 0, lambda: self._cb_fallback_wait(idx, name, delay)),
+            "on_fallback_error": lambda fb_name, error: self.root.after(
+                0, lambda: self._cb_fallback_error(fb_name, error)),
         }
 
         self.executor_thread = Executor(
@@ -2436,6 +2432,12 @@ class OrchestratorApp:
         self._set_status(
             f"⏳ Esperando {delay}s tras recuperación de: {name}",
             DARK_COLORS["blue"])
+
+    def _cb_fallback_error(self, fb_name, error):
+        """Called when fallback script fails to launch (no detiene el loop)."""
+        self._set_status(
+            f"⚠️ Error al lanzar recuperación {fb_name}: {error}",
+            DARK_COLORS["yellow"])
 
     def _cb_error(self, msg):
         self._dark_dialog("Error", msg, "error")

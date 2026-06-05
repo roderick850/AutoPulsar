@@ -114,16 +114,11 @@ class Executor(threading.Thread):
                                     os.path.basename(item["path"]),
                                     os.path.basename(fallback_script))
                                 try:
-                                    # Esperar a que termine el script de recuperación
-                                    fb_timeout = fallback_cfg.get("timeout", 120)
-                                    subprocess.run(fallback_script, shell=True,
-                                                   timeout=fb_timeout)
-                                except subprocess.TimeoutExpired:
-                                    self._safe_callback("on_error",
-                                        f"Timeout en script de recuperación: {os.path.basename(fallback_script)}")
+                                    # Lanzar en background — no esperar a que termine
+                                    subprocess.Popen(fallback_script, shell=True)
                                 except Exception as e:
-                                    self._safe_callback("on_error",
-                                        f"Fallo script de recuperación: {e}")
+                                    self._safe_callback("on_fallback_error",
+                                        os.path.basename(fallback_script), str(e))
                                 item["_consecutive_failures"] = 0  # reset after fallback
 
                                 # Delay post-fallback antes de continuar
