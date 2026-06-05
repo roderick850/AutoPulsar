@@ -741,6 +741,8 @@ class OrchestratorApp:
             check = "✅" if enabled else "❌"
             primero = "🔂" if item.get("first_loop_only", False) else ""
             icono = "🖼️" if item.get("icon_path", "") else ""
+            n_cond = len(item.get("conditions", {}).get("items", []))
+            cond_text = f"⚙️{n_cond}" if n_cond else ""
 
             if group:
                 parts = group.split("/")
@@ -769,7 +771,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, icono, f"{indent}{os.path.basename(item['path'])}",
+                    values=(idx + 1, check, primero, cond_text, f"{indent}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_grouped",),
@@ -779,7 +781,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     "", tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, icono, os.path.basename(item["path"]),
+                    values=(idx + 1, check, primero, cond_text, os.path.basename(item["path"]),
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_ungrouped",),
@@ -864,8 +866,8 @@ class OrchestratorApp:
             current = self.playlist[idx].get("first_loop_only", False)
             self.playlist[idx]["first_loop_only"] = not current
             self._refresh_list()
-        elif column == "#4":  # icono (capture/select)
-            self._capture_icon_for(idx)
+        elif column == "#4":  # condiciones
+            self._edit_conditions(idx)
 
     def _on_group_expand_collapse(self, event):
         """Real-time sync of collapsed state when user clicks expand/collapse arrows."""
@@ -1001,6 +1003,10 @@ class OrchestratorApp:
                            command=lambda: self._context_remove_group(group_path))
 
         elif info[0] == "script":
+            idx = info[1]
+            menu.add_command(label="⚙️ Condiciones",
+                           command=lambda i=idx: self._edit_conditions(i))
+            menu.add_separator()
             menu.add_command(label="📁 Agrupar seleccionados",
                            command=self._group_selected)
             menu.add_command(label="✂️ Desagrupar",
@@ -1129,110 +1135,230 @@ class OrchestratorApp:
         dlg.wait_window()
 
     # ═══════════════════════════════════════════════════════════════
-    # ICON CAPTURE
+    # CONDICIONES (iconos)
     # ═══════════════════════════════════════════════════════════════
 
-    def _capture_icon_for(self, idx):
-        """Abrir ventana de captura para seleccionar icono en pantalla."""
-        import subprocess, io, base64
+    def _edit_conditions(self, idx):
+        """Abrir ventana editor de condiciones para un script."""
+        item = self.playlist[idx]
+        name = os.path.basename(item["path"])
+        conditions = item.get("conditions", {"mode": "and", "items": []})
+        # Trabajar con copia para no modificar hasta Guardar
+        cond_copy = {
+            "mode": conditions.get("mode", "and"),
+            "items": [dict(c) for c in conditions.get("items", [])],
+        }
 
-        # Tomar screenshot rápido
-        try:
-            import mss
-            with mss.mss() as sct:
-                screen = sct.grab(sct.monitors[1])
-                from PIL import Image
-                img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
-        except Exception:
+        dlg = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        dlg.title(f"Condiciones — {name}")
+        dlg.geometry("420x380")
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.lift()
+        _apply_dark_titlebar(dlg, retries=3)
+
+        pad = {"padx": 8, "pady": 4}
+        c = DARK_COLORS
+
+        # ── Modo AND/OR ──
+        mode_frame = ttk.Frame(dlg)
+        mode_frame.pack(fill=tk.X, **pad)
+        ttk.Label(mode_frame, text="Modo:").pack(side=tk.LEFT)
+        mode_var = tk.StringVar(value=cond_copy["mode"])
+        mode_combo = ttk.Combobox(mode_frame, textvariable=mode_var,
+                                  values=["and", "or"], width=6, state="readonly")
+        mode_combo.pack(side=tk.LEFT, padx=6)
+        ttk.Label(mode_frame, text="and = Todas  |  or = Alguna",
+                  style="Dim.TLabel").pack(side=tk.LEFT)
+
+        # ── Lista de condiciones ──
+        list_frame = ttk.Frame(dlg)
+        list_frame.pack(fill=tk.BOTH, expand=True, **pad)
+
+        columns = ("tipo", "label", "icono")
+        tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=6)
+        tree.heading("tipo", text="Tipo")
+        tree.heading("label", text="Etiqueta")
+        tree.heading("icono", text="Icono")
+        tree.column("tipo", width=80, anchor="center")
+        tree.column("label", width=160, anchor="w")
+        tree.column("icono", width=120, anchor="center")
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        vsb = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        def _refresh_cond_list():
+            for i in tree.get_children():
+                tree.delete(i)
+            for ci, cond in enumerate(cond_copy["items"]):
+                ctype = cond.get("type", "require")
+                label = cond.get("label", "")
+                ipath = cond.get("icon_path", "")
+                tipo_display = "✅ Requerir" if ctype == "require" else "❌ Bloquear"
+                icon_display = os.path.basename(ipath) if ipath else "(sin icono)"
+                tree.insert("", tk.END, iid=str(ci),
+                           values=(tipo_display, label, icon_display))
+
+        _refresh_cond_list()
+
+        # ── Botones de acción ──
+        btn_frame = ttk.Frame(dlg)
+        btn_frame.pack(fill=tk.X, **pad)
+
+        def _add_condition():
+            # Abrir captura de pantalla
             try:
+                import mss
+                with mss.mss() as sct:
+                    screen = sct.grab(sct.monitors[1])
+                    from PIL import Image
+                    img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
+            except Exception:
                 from PIL import ImageGrab
                 img = ImageGrab.grab(all_screens=True)
-            except Exception:
-                self._dark_dialog("Error", "No se pudo capturar la pantalla.", "error")
+
+            # Ventana de selección
+            cap_win = tk.Toplevel(dlg, bg="black")
+            cap_win.attributes("-fullscreen", True)
+            cap_win.attributes("-topmost", True)
+            cap_win.configure(cursor="crosshair")
+
+            from PIL import ImageTk
+            photo = ImageTk.PhotoImage(img)
+            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+            canvas.pack(fill=tk.BOTH, expand=True)
+            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+            canvas._photo_ref = photo
+
+            rect = None
+            start = [0, 0]
+
+            def on_down(e):
+                start[0], start[1] = e.x, e.y
+                nonlocal rect
+                if rect:
+                    canvas.delete(rect)
+                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                    outline="#7c7cf8", width=2, dash=(4,2))
+
+            def on_drag(e):
+                nonlocal rect
+                if rect:
+                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+
+            def on_up(e):
+                x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                cap_win.destroy()
+                if x2 - x1 < 10 or y2 - y1 < 10:
+                    return
+                # Recortar y guardar
+                cropped = img.crop((x1, y1, x2, y2))
+                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                os.makedirs(icons_dir, exist_ok=True)
+                fname = f"cond_{idx}_{len(cond_copy['items'])}_{int(time.time())}.png"
+                save_path = os.path.join(icons_dir, fname)
+                cropped.save(save_path)
+                cond_copy["items"].append({
+                    "type": "require",
+                    "icon_path": save_path,
+                    "label": "",
+                })
+                _refresh_cond_list()
+
+            canvas.bind("<ButtonPress-1>", on_down)
+            canvas.bind("<B1-Motion>", on_drag)
+            canvas.bind("<ButtonRelease-1>", on_up)
+            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
+
+            canvas.create_text(img.width // 2, 30,
+                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+        def _remove_condition():
+            sel = tree.selection()
+            if not sel:
                 return
+            indices = sorted([int(s) for s in sel], reverse=True)
+            for i in indices:
+                if 0 <= i < len(cond_copy["items"]):
+                    del cond_copy["items"][i]
+            _refresh_cond_list()
 
-        # Guardar temp
-        tmp_path = os.path.join(_get_app_dir(), "_capture_temp.png")
-        img.save(tmp_path)
+        def _toggle_type():
+            sel = tree.selection()
+            if not sel:
+                return
+            i = int(sel[0])
+            if 0 <= i < len(cond_copy["items"]):
+                current = cond_copy["items"][i]["type"]
+                cond_copy["items"][i]["type"] = "block" if current == "require" else "require"
+                _refresh_cond_list()
 
-        self._icon_capture_idx = idx
-        self._icon_capture_img = img
-        self._show_capture_window(img)
+        def _edit_label():
+            sel = tree.selection()
+            if not sel:
+                return
+            i = int(sel[0])
+            if 0 <= i < len(cond_copy["items"]):
+                # Simple entry popup
+                lbl_win = tk.Toplevel(dlg, bg=c["bg"])
+                lbl_win.title("Etiqueta")
+                lbl_win.geometry("260x80")
+                lbl_win.transient(dlg)
+                lbl_win.grab_set()
+                lbl_var = tk.StringVar(value=cond_copy["items"][i].get("label", ""))
+                entry = ttk.Entry(lbl_win, textvariable=lbl_var, width=30)
+                entry.pack(padx=10, pady=(10, 5))
+                entry.select_range(0, tk.END)
+                entry.focus_set()
 
-    def _show_capture_window(self, img):
-        """Mostrar ventana de selección de región sobre la screenshot."""
-        win = tk.Toplevel(self.root, bg="black")
-        win.attributes("-fullscreen", True)
-        win.attributes("-topmost", True)
-        win.configure(cursor="crosshair")
+                def _save_label():
+                    cond_copy["items"][i]["label"] = lbl_var.get().strip()
+                    lbl_win.destroy()
+                    _refresh_cond_list()
 
-        # Mostrar imagen de fondo
-        from PIL import ImageTk
-        photo = ImageTk.PhotoImage(img)
-        canvas = tk.Canvas(win, bg="black", highlightthickness=0)
-        canvas.pack(fill=tk.BOTH, expand=True)
-        canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-        canvas._photo_ref = photo  # mantener referencia
+                entry.bind("<Return>", lambda e: _save_label())
+                ttk.Button(lbl_win, text="Guardar", command=_save_label).pack()
 
-        # Rectángulo de selección
-        rect = None
-        start_x = [0]
-        start_y = [0]
+        ttk.Button(btn_frame, text="➕ Agregar", command=_add_condition,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🗑️ Quitar", command=_remove_condition,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🔄 Cambiar tipo", command=_toggle_type,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🏷️ Etiqueta", command=_edit_label,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
-        def on_mouse_down(event):
-            start_x[0] = event.x
-            start_y[0] = event.y
-            nonlocal rect
-            if rect:
-                canvas.delete(rect)
-            rect = canvas.create_rectangle(
-                event.x, event.y, event.x, event.y,
-                outline="#7c7cf8", width=2, dash=(4, 2)
-            )
+        # ── Guardar / Cancelar ──
+        bottom = ttk.Frame(dlg)
+        bottom.pack(fill=tk.X, **pad)
 
-        def on_mouse_drag(event):
-            nonlocal rect
-            if rect:
-                canvas.coords(rect, start_x[0], start_y[0], event.x, event.y)
-
-        def on_mouse_up(event):
-            x1, y1 = start_x[0], start_y[0]
-            x2, y2 = event.x, event.y
-            if x1 > x2:
-                x1, x2 = x2, x1
-            if y1 > y2:
-                y1, y2 = y2, y1
-            w, h = x2 - x1, y2 - y1
-            win.destroy()
-            if w < 10 or h < 10:
-                return  # Selección muy chica, cancelar
-
-            # Recortar y guardar
-            cropped = self._icon_capture_img.crop((x1, y1, x2, y2))
-            icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
-            os.makedirs(icons_dir, exist_ok=True)
-            idx = self._icon_capture_idx
-            fname = f"icon_{idx}_{os.path.basename(self.playlist[idx]['path'])}.png"
-            save_path = os.path.join(icons_dir, fname)
-            cropped.save(save_path)
-            self.playlist[idx]["icon_path"] = save_path
+        def _save():
+            cond_copy["mode"] = mode_var.get()
+            item["conditions"] = {
+                "mode": cond_copy["mode"],
+                "items": cond_copy["items"],
+            }
             self._refresh_list()
+            dlg.destroy()
 
-        def on_escape(event):
-            win.destroy()
+        def _clear_all():
+            if messagebox.askyesno("Limpiar", "¿Eliminar todas las condiciones?"):
+                cond_copy["items"].clear()
+                _refresh_cond_list()
 
-        canvas.bind("<ButtonPress-1>", on_mouse_down)
-        canvas.bind("<B1-Motion>", on_mouse_drag)
-        canvas.bind("<ButtonRelease-1>", on_mouse_up)
-        win.bind("<Escape>", on_escape)
+        ttk.Button(bottom, text="🗑️ Limpiar todo", command=_clear_all,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+        ttk.Button(bottom, text="Cancelar", command=dlg.destroy,
+                   style="Compact.TButton").pack(side=tk.RIGHT, padx=2)
+        ttk.Button(bottom, text="✅ Guardar", command=_save,
+                   style="Compact.TButton").pack(side=tk.RIGHT, padx=2)
 
-        # Instrucción breve
-        canvas.create_text(
-            img.width // 2, 30,
-            text="🖼️  Selecciona el área del icono (clic + arrastrar)  |  ESC para cancelar",
-            fill="#cdd6f4", font=("Segoe UI", 11, "bold"),
-            anchor=tk.N
-        )
+        dlg.wait_window()
 
     def _add_script(self):
         path = filedialog.askopenfilename(

@@ -4,7 +4,7 @@ import time
 import os
 
 try:
-    from icon_detector import check_icon
+    from icon_detector import check_conditions
     HAS_ICON_DETECTOR = True
 except ImportError:
     HAS_ICON_DETECTOR = False
@@ -75,10 +75,10 @@ class Executor(threading.Thread):
                 if current_loop > 1 and item.get("first_loop_only", False):
                     continue
 
-                # Check icon requirement — skip if icon not visible on screen
-                icon_path = item.get("icon_path", "")
-                if icon_path and HAS_ICON_DETECTOR:
-                    if not check_icon(icon_path):
+                # Check conditions — skip if conditions not met
+                conditions = item.get("conditions", {})
+                if conditions and conditions.get("items") and HAS_ICON_DETECTOR:
+                    if not check_conditions(conditions):
                         self._safe_callback("on_skip_icon", idx, os.path.basename(item["path"]))
                         continue
 

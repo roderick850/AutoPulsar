@@ -114,6 +114,55 @@ def check_icon(icon_path, region=None, threshold=0.05):
     return result is not None
 
 
+def check_conditions(conditions):
+    """Evalúa múltiples condiciones para decidir si ejecutar un script.
+    
+    conditions = {
+        "mode": "and" | "or",
+        "items": [
+            {"type": "require", "icon_path": "...", "label": "menú"},
+            {"type": "block",   "icon_path": "...", "label": "cargando"},
+        ]
+    }
+    
+    - "require": el icono DEBE estar visible (check_icon → True)
+    - "block":   el icono NO debe estar visible (check_icon → False)
+    - mode "and": TODAS las condiciones deben cumplirse
+    - mode "or":  AL MENOS UNA condición debe cumplirse
+    
+    Retorna True si el script DEBE ejecutarse.
+    Si no hay condiciones, retorna True.
+    """
+    items = conditions.get("items", [])
+    if not items:
+        return True
+
+    mode = conditions.get("mode", "and")
+    results = []
+
+    for cond in items:
+        icon_path = cond.get("icon_path", "")
+        ctype = cond.get("type", "require")
+
+        if not icon_path:
+            results.append(True if ctype == "block" else False)
+            continue
+
+        visible = check_icon(icon_path)
+
+        if ctype == "require":
+            results.append(visible)       # debe estar → True si visible
+        elif ctype == "block":
+            results.append(not visible)   # NO debe estar → True si NO visible
+        else:
+            results.append(visible)
+
+    if mode == "or":
+        return any(results)
+    else:  # "and"
+        return all(results)
+
+
 # ── Prueba rápida ──
 if __name__ == "__main__":
     import sys
