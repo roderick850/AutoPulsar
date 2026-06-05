@@ -1,5 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 import os
 import subprocess
 import threading
@@ -23,26 +25,9 @@ def format_time(seconds):
     return f"{s}s"
 
 
-# ── Dark Theme Colors ──────────────────────────────────────────────
-DARK_COLORS = {
-    "bg":           "#1e1e2e",   # main background
-    "surface":      "#282840",   # frames, cards
-    "surface_alt":  "#313148",   # alternate surface (treeview rows)
-    "border":       "#3b3b56",   # subtle borders
-    "text":         "#cdd6f4",   # primary text
-    "text_dim":     "#8b8da8",   # secondary text
-    "accent":       "#7c7cf8",   # buttons, highlights
-    "accent_hover": "#9696ff",   # hover state
-    "green":        "#5cce8e",   # success / ready
-    "green_dim":    "#3a8a5e",   # darker green
-    "red":          "#e06070",   # stop / error
-    "yellow":       "#e0b860",   # warning
-    "blue":         "#6090e0",   # running
-    "purple":       "#b090e0",   # waiting
-    "menu_bg":      "#252538",   # menu bar background
-    "menu_fg":      "#cdd6f4",   # menu bar text
-    "menu_active":  "#3b3b56",   # menu hover
-}
+# ── Theme Colors ──────────────────────────────────────────────────
+# Populated from ttkbootstrap theme in __init__
+DARK_COLORS = {}
 
 
 def _apply_dark_titlebar(toplevel, retries=5):
@@ -92,6 +77,10 @@ class OrchestratorApp:
         self.root = root
         self.root.title("TinyTask Orchestrator")
         self.root.minsize(600, 380)
+
+        # Populate DARK_COLORS from ttkbootstrap theme
+        self._populate_theme_colors()
+
         self.root.configure(bg=DARK_COLORS["bg"])
 
         # Dark title bar on Windows (with retry logic)
@@ -121,9 +110,6 @@ class OrchestratorApp:
         self.hotkey = HotkeyListener()
         self.hotkey.start(self.saved_hotkey, self._hotkey_toggle)
         self.hotkey_var_set_to = self.saved_hotkey.upper()
-
-        # Setup dark theme before building UI
-        self._setup_dark_theme()
 
         # ── Mini Bar state (must be before _build_menu) ──
         self.mini_bar = None
@@ -288,104 +274,35 @@ class OrchestratorApp:
     # DARK THEME (sin cambios de lógica, solo colores)
     # ═══════════════════════════════════════════════════════════════
 
-    def _setup_dark_theme(self):
-        """Configure ttk styles for a compact dark theme (clam-based)."""
-        style = ttk.Style()
-        style.theme_use("clam")
+    def _populate_theme_colors(self):
+        """Populate DARK_COLORS from the active ttkbootstrap theme."""
+        sc = self.root.style.colors
 
-        c = DARK_COLORS
+        DARK_COLORS.update({
+            "bg":           sc.bg,
+            "surface":      sc.secondary,
+            "surface_alt":  sc.light,
+            "border":       sc.border,
+            "text":         sc.fg,
+            "text_dim":     sc.secondary,
+            "accent":       sc.primary,
+            "accent_hover": sc.primary,
+            "green":        sc.success,
+            "green_dim":    sc.success,
+            "red":          sc.danger,
+            "yellow":       sc.warning,
+            "blue":         sc.info,
+            "purple":       sc.info,
+            "menu_bg":      sc.bg,
+            "menu_fg":      sc.fg,
+            "menu_active":  sc.primary,
+        })
 
-        # ── Global defaults ──
-        style.configure(".", background=c["bg"], foreground=c["text"],
-                        font=("Segoe UI", 9), borderwidth=0)
-
-        # ── Frame ──
-        style.configure("TFrame", background=c["bg"])
-        style.configure("Dark.TFrame", background=c["surface"])
-
-        # ── LabelFrame ──
-        style.configure("TLabelframe", background=c["bg"], foreground=c["text_dim"],
-                        bordercolor=c["border"], borderwidth=1, relief="solid")
-        style.configure("TLabelframe.Label", background=c["bg"], foreground=c["text_dim"],
-                        font=("Segoe UI", 9))
-
-        # ── Label ──
-        style.configure("TLabel", background=c["bg"], foreground=c["text"],
-                        font=("Segoe UI", 9))
-        style.configure("Dark.TLabel", background=c["surface"], foreground=c["text"],
-                        font=("Segoe UI", 9))
-        style.configure("Dim.TLabel", foreground=c["text_dim"], font=("Segoe UI", 9))
-        style.configure("Bold.TLabel", foreground=c["text"], font=("Segoe UI", 9, "bold"))
-
-        # ── Button ──
-        style.configure("TButton", background=c["accent"], foreground="#ffffff",
-                        borderwidth=0, focusthickness=0, relief="flat",
-                        padding=(8, 3), font=("Segoe UI", 9))
-        style.map("TButton",
-                  background=[("active", c["accent_hover"]),
-                              ("disabled", c["surface_alt"])],
-                  foreground=[("disabled", c["text_dim"])])
-
-        # ── Entry ──
-        style.configure("TEntry", fieldbackground=c["surface_alt"],
-                        foreground=c["text"], borderwidth=1,
-                        bordercolor=c["border"], relief="solid",
-                        padding=(4, 2), insertcolor=c["text"])
-
-        # ── Combobox ──
-        style.configure("TCombobox", fieldbackground=c["surface_alt"],
-                        background=c["surface_alt"], foreground=c["text"],
-                        arrowcolor=c["text"], borderwidth=1,
-                        bordercolor=c["border"], relief="solid",
-                        padding=(4, 2))
-        style.map("TCombobox",
-                  fieldbackground=[("readonly", c["surface_alt"]),
-                                   ("disabled", c["surface"])],
-                  background=[("readonly", c["surface_alt"])],
-                  foreground=[("readonly", c["text"]),
-                              ("disabled", c["text_dim"])])
-        self.root.option_add("*TCombobox*Listbox.background", c["surface_alt"])
-        self.root.option_add("*TCombobox*Listbox.foreground", c["text"])
-        self.root.option_add("*TCombobox*Listbox.selectBackground", c["accent"])
-        self.root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
-        self.root.option_add("*TCombobox*Listbox.font", ("Segoe UI", 9))
-
-        # ── Treeview ──
-        style.configure("Treeview", background=c["surface"],
-                        foreground=c["text"], fieldbackground=c["surface"],
-                        borderwidth=1, bordercolor=c["border"],
-                        relief="solid", rowheight=22)
-        style.configure("Treeview.Heading", background=c["surface_alt"],
-                        foreground=c["text"], font=("Segoe UI", 8, "bold"),
-                        borderwidth=0, relief="flat", padding=(4, 2))
-        style.map("Treeview",
-                  background=[("selected", c["accent"])],
-                  foreground=[("selected", "#ffffff")])
-        style.map("Treeview.Heading",
-                  background=[("active", c["border"])])
-
-        # ── Scrollbar ──
-        style.configure("TScrollbar", background=c["bg"],
-                        troughcolor=c["surface_alt"], borderwidth=0,
-                        arrowsize=12, arrowcolor=c["text_dim"])
-        style.map("TScrollbar",
-                  background=[("active", c["border"])])
-
-        # ── Progressbar ──
-        style.configure("TProgressbar", background=c["green"],
-                        troughcolor=c["surface_alt"], borderwidth=0,
-                        thickness=8)
-
-        # ── Spinbox ──
-        style.configure("TSpinbox", fieldbackground=c["surface_alt"],
-                        foreground=c["text"], borderwidth=1,
-                        bordercolor=c["border"], relief="solid",
-                        padding=(4, 2), arrowcolor=c["text"],
-                        insertcolor=c["text"])
-
-        # ── Compact variants ──
+        # ── Compact custom styles ──
+        style = self.root.style
         style.configure("Compact.TButton", padding=(5, 1), font=("Segoe UI", 8))
         style.configure("Compact.TLabel", font=("Segoe UI", 8))
+        style.configure("Dim.TLabel", font=("Segoe UI", 9))
         style.configure("Compact.TEntry", padding=(2, 1), font=("Segoe UI", 8))
 
     def _build_ui(self):
@@ -1103,7 +1020,7 @@ class OrchestratorApp:
                   "error": DARK_COLORS["red"], "success": DARK_COLORS["green"]}
         accent = colors.get(kind, DARK_COLORS["blue"])
 
-        dlg = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        dlg = ttk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         # Dark titlebar on dialog
         dlg.after(50, lambda: _apply_dark_titlebar(dlg, retries=3))
         dlg.title(title)
@@ -1151,7 +1068,7 @@ class OrchestratorApp:
             "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "script": ""})),
         }
 
-        dlg = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        dlg = ttk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
         dlg.geometry("520x560")
         dlg.resizable(False, False)
@@ -1243,7 +1160,7 @@ class OrchestratorApp:
                     from PIL import ImageGrab
                     img2 = ImageGrab.grab(all_screens=True)
 
-                cap_win = tk.Toplevel(dlg, bg="black")
+                cap_win = ttk.Toplevel(dlg, bg="black")
                 # Posicionar en el monitor destino ANTES de fullscreen
                 cap_win.geometry(f"+{monitor['left']}+{monitor['top']}")
                 cap_win.attributes("-fullscreen", True)
@@ -1307,7 +1224,7 @@ class OrchestratorApp:
                 return
 
             # ── Más de un monitor: mostrar selector ──
-            sel_win = tk.Toplevel(dlg)
+            sel_win = ttk.Toplevel(dlg)
             sel_win.title("Seleccionar monitor")
             sel_win.configure(bg="#1e1e2e")
             sel_win.resizable(False, False)
@@ -1370,7 +1287,7 @@ class OrchestratorApp:
             i = int(sel[0])
             if 0 <= i < len(cond_copy["items"]):
                 # Simple entry popup
-                lbl_win = tk.Toplevel(dlg, bg=c["bg"])
+                lbl_win = ttk.Toplevel(dlg, bg=c["bg"])
                 lbl_win.title("Etiqueta")
                 lbl_win.geometry("260x80")
                 lbl_win.transient(dlg)
@@ -1528,7 +1445,7 @@ class OrchestratorApp:
             self._dark_dialog("Error", f"El archivo no existe:\n{path}", "error")
             return
 
-        win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        win = ttk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Agregar script")
         win.geometry("300x260")
         win.resizable(False, False)
@@ -1610,7 +1527,7 @@ class OrchestratorApp:
         idx = info[1]
         item = self.playlist[idx]
 
-        win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        win = ttk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Editar script")
         win.geometry("300x280")
         win.resizable(False, False)
@@ -2077,7 +1994,7 @@ class OrchestratorApp:
 
     def _ask_group_name(self, callback, label="Nombre:"):
         """Show a small dialog to ask for a group name."""
-        win = tk.Toplevel(self.root, bg=DARK_COLORS["bg"])
+        win = ttk.Toplevel(self.root, bg=DARK_COLORS["bg"])
         win.title("Nombre del grupo")
         win.geometry("300x130")
         win.resizable(False, False)

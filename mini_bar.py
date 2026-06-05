@@ -8,26 +8,9 @@ Al cerrar (X) se oculta; se restaura desde el menú View.
 """
 
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
 import os
 import ctypes
-
-# ── Dark Theme (mismos colores que la app principal) ──────────────
-DARK_COLORS = {
-    "bg":           "#1e1e2e",
-    "surface":      "#282840",
-    "surface_alt":  "#313148",
-    "border":       "#3b3b56",
-    "text":         "#cdd6f4",
-    "text_dim":     "#8b8da8",
-    "accent":       "#7c7cf8",
-    "accent_hover": "#9696ff",
-    "green":        "#5cce8e",
-    "red":          "#e06070",
-    "yellow":       "#e0b860",
-    "blue":         "#6090e0",
-    "purple":       "#b090e0",
-}
 
 
 def _apply_dark_titlebar(toplevel, retries=5):
@@ -96,10 +79,14 @@ class MiniBar:
         self.app = app
         self.settings = settings or {}
 
-        # Crear Toplevel independiente
-        self.root = tk.Toplevel(app.root)
+        # Get colors from main app's theme
+        from gui import DARK_COLORS
+        self.c = DARK_COLORS
+
+        # Crear Toplevel independiente (ttkbootstrap themed)
+        self.root = ttk.Toplevel(app.root)
         self.root.title("TinyTask — Mini")
-        self.root.configure(bg=DARK_COLORS["bg"])
+        self.root.configure(bg=self.c["bg"])
         self.root.minsize(300, 36)
         self.root.maxsize(1200, 36)
         self.root.resizable(True, False)
@@ -138,7 +125,7 @@ class MiniBar:
     # ── UI ─────────────────────────────────────────────────────────
 
     def _build_ui(self, pinned):
-        c = DARK_COLORS
+        c = self.c
 
         bar = tk.Frame(self.root, bg=c["bg"], height=30)
         bar.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
@@ -154,13 +141,9 @@ class MiniBar:
         self.step_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 3))
 
         # ── Mini barra de progreso ──
-        style = ttk.Style()
-        style.configure("Mini.Horizontal.TProgressbar",
-                        background=c["green"], troughcolor=c["surface_alt"],
-                        borderwidth=0, thickness=6)
         self.progress = ttk.Progressbar(
             bar, orient=tk.HORIZONTAL, mode="determinate",
-            style="Mini.Horizontal.TProgressbar", length=70,
+            bootstyle="success", length=70,
         )
         self.progress.pack(side=tk.LEFT, padx=2)
 
@@ -237,11 +220,11 @@ class MiniBar:
         # Estado del botón stop
         if is_running:
             self.stop_btn.config(
-                bg=DARK_COLORS["red"], fg="#ffffff", state="normal",
+                bg=self.c["red"], fg="#ffffff", state="normal",
             )
         else:
             self.stop_btn.config(
-                bg=DARK_COLORS["surface_alt"], fg=DARK_COLORS["text_dim"],
+                bg=self.c["surface_alt"], fg=self.c["text_dim"],
                 state="disabled",
             )
 
@@ -268,8 +251,8 @@ class MiniBar:
         self._pinned = not self._pinned
         self.root.attributes("-topmost", self._pinned)
         self.pin_btn.config(
-            bg=DARK_COLORS["surface"] if self._pinned else DARK_COLORS["bg"],
-            fg=DARK_COLORS["text"] if self._pinned else DARK_COLORS["text_dim"],
+            bg=self.c["surface"] if self._pinned else self.c["bg"],
+            fg=self.c["text"] if self._pinned else self.c["text_dim"],
         )
 
     def _restore_main(self):

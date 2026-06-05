@@ -1,9 +1,9 @@
-import tkinter as tk
+import ttkbootstrap as ttk
 from gui import OrchestratorApp
 
 
 def main():
-    root = tk.Tk()
+    root = ttk.Window(themename="cyborg")
     OrchestratorApp(root)
     root.mainloop()
 
