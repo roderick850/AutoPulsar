@@ -358,6 +358,10 @@ class OrchestratorApp:
         style.configure("TSpinbox", fieldbackground=c["surface_alt"],
                         foreground=c["text"], bordercolor=c["border"],
                         borderwidth=1, arrowcolor=c["text"])
+        style.map("TSpinbox",
+                  fieldbackground=[("disabled", c["surface_alt"]),
+                                  ("readonly", c["surface_alt"])],
+                  foreground=[("disabled", c["text_dim"])])
 
         # ── Compact styles (para ttk fallback) ──
         style.configure("Compact.TButton", padding=4, font=("Segoe UI", 9),
@@ -397,11 +401,15 @@ class OrchestratorApp:
         style.configure("TCheckbutton", background=c["bg"],
                         foreground=c["text"])
         style.map("TCheckbutton",
-                  background=[("active", c["bg"]), ("selected", c["bg"])])
+                  background=[("active", c["bg"]), ("selected", c["bg"]),
+                             ("disabled", c["bg"])],
+                  foreground=[("disabled", c["text_dim"])])
         style.configure("TRadiobutton", background=c["bg"],
                         foreground=c["text"])
         style.map("TRadiobutton",
-                  background=[("active", c["bg"]), ("selected", c["bg"])])
+                  background=[("active", c["bg"]), ("selected", c["bg"]),
+                             ("disabled", c["bg"])],
+                  foreground=[("disabled", c["text_dim"])])
 
         # ── Menubar (fallback si CTk no lo cubre) ──
         style.configure("TMenubutton", background=c["menu_bg"],
@@ -1738,14 +1746,26 @@ class OrchestratorApp:
                     textvariable=ru_thresh_var, width=8).pack(side=tk.RIGHT)
 
         def _toggle_ru_widgets(*args):
-            state = "normal" if ru_enabled_var.get() else "disabled"
-            for child in ru_frame.winfo_children():
-                if isinstance(child, ttk.Frame):
-                    for sub in child.winfo_children():
-                        try: sub.configure(state=state)
-                        except: pass
+            enabled = ru_enabled_var.get()
+            def _set_state(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child, ttk.Frame):
+                        _set_state(child)
+                    else:
+                        try:
+                            if isinstance(child, ttk.Spinbox):
+                                child.configure(state="normal" if enabled else "readonly")
+                            elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
+                                child.configure(state="normal" if enabled else "disabled")
+                            else:
+                                child.configure(state="normal" if enabled else "disabled")
+                        except Exception:
+                            pass
+            _set_state(ru_frame)
+            self.root.update_idletasks()
 
         ru_enabled_var.trace_add("write", _toggle_ru_widgets)
+        _toggle_ru_widgets()  # estado inicial
 
         time_preview = ttk.Label(form, text="Tiempo: 10s", style="Dim.TLabel")
         time_preview.pack(pady=(8, 0))
@@ -1994,14 +2014,26 @@ class OrchestratorApp:
                     textvariable=ru_thresh_var, width=8).pack(side=tk.RIGHT)
 
         def _toggle_ru_widgets(*args):
-            state = "normal" if ru_enabled_var.get() else "disabled"
-            for child in ru_frame.winfo_children():
-                if isinstance(child, ttk.Frame):
-                    for sub in child.winfo_children():
-                        try: sub.configure(state=state)
-                        except: pass
+            enabled = ru_enabled_var.get()
+            def _set_state(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child, ttk.Frame):
+                        _set_state(child)
+                    else:
+                        try:
+                            if isinstance(child, ttk.Spinbox):
+                                child.configure(state="normal" if enabled else "readonly")
+                            elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
+                                child.configure(state="normal" if enabled else "disabled")
+                            else:
+                                child.configure(state="normal" if enabled else "disabled")
+                        except Exception:
+                            pass
+            _set_state(ru_frame)
+            self.root.update_idletasks()
 
         ru_enabled_var.trace_add("write", _toggle_ru_widgets)
+        _toggle_ru_widgets()  # estado inicial
 
         time_preview = ttk.Label(form, text=f"Tiempo: {format_time(self._calc_item_time(item))}", style="Dim.TLabel")
         time_preview.pack(pady=(8, 0))
