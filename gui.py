@@ -1769,7 +1769,7 @@ class OrchestratorApp:
         ru_thresh_row = ttk.Frame(ru_frame)
         ru_thresh_row.pack(fill=tk.X, pady=(4, 0))
         ttk.Label(ru_thresh_row, text="Tolerancia (0-1):", style="Compact.TLabel").pack(side=tk.LEFT)
-        ru_thresh_var = tk.DoubleVar(value=0.05)
+        ru_thresh_var = tk.DoubleVar(value=0.08)
         ttk.Spinbox(ru_thresh_row, from_=0.01, to=1.0, increment=0.01,
                     textvariable=ru_thresh_var, width=8).pack(side=tk.RIGHT)
 
@@ -2070,7 +2070,7 @@ class OrchestratorApp:
         ttk.Spinbox(ru_max_row, from_=0, to=99999, textvariable=ru_max_var, width=8).pack(side=tk.RIGHT)
         ttk.Label(ru_max_row, text="(0=sin límite)", style="Dim.TLabel").pack(side=tk.RIGHT, padx=(4, 0))
 
-        ru_thresh_var = tk.DoubleVar(value=item.get("repeat_until_threshold", 0.05))
+        ru_thresh_var = tk.DoubleVar(value=item.get("repeat_until_threshold", 0.08))
         ru_thresh_row = ttk.Frame(ru_frame)
         ru_thresh_row.pack(fill=tk.X, pady=(4, 0))
         ttk.Label(ru_thresh_row, text="Tolerancia (0-1):", style="Compact.TLabel").pack(side=tk.LEFT)

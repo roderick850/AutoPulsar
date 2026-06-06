@@ -140,17 +140,28 @@ class Executor(threading.Thread):
 
                         completed_reps_total += 1
 
+                        # ── Poll condition during duration ──
+                        poll_interval = 1.0  # check every 1s
+                        condition_met = False
                         slept = 0.0
                         while slept < duration and not self.stop_event.is_set():
-                            time.sleep(0.1)
-                            slept += 0.1
+                            time.sleep(min(poll_interval, duration - slept))
+                            slept += poll_interval
+                            if self.stop_event.is_set():
+                                break
+                            found, _ = check_icon(ru_icon, None, ru_threshold)
+                            condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
+                            if condition_met:
+                                break
 
-                        if self.stop_event.is_set():
-                            break
-
-                        # ── Check the repeat-until condition ──
-                        found, _ = check_icon(ru_icon, None, ru_threshold)
-                        condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
+                        # ── Final check with retries (handles timing edge cases) ──
+                        if not condition_met and not self.stop_event.is_set():
+                            for _ in range(3):
+                                found, _ = check_icon(ru_icon, None, ru_threshold)
+                                condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
+                                if condition_met:
+                                    break
+                                time.sleep(0.3)
 
                         self._safe_callback("on_repeat_until_check", idx, name,
                             iteration, ru_max, found, condition_met)
