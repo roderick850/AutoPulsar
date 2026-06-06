@@ -1140,9 +1140,9 @@ class OrchestratorApp:
                   wraplength=350, justify=tk.CENTER).pack(pady=(5, 12))
 
         btn = ctk.CTkButton(frame, text="  Aceptar  ",
-                        bg=accent, fg="#ffffff", font=("Segoe UI", 9, "bold"),
-                        borderwidth=0, activebackground=DARK_COLORS["accent_hover"],
-                        cursor="hand2", padx=20, pady=4,
+                        fg_color=accent, text_color="#ffffff", font=("Segoe UI", 9, "bold"),
+                        border_width=0, hover_color=DARK_COLORS["accent_hover"],
+                        cursor="hand2", width=20,
                         command=dlg.destroy)
         btn.pack()
 
@@ -1620,6 +1620,28 @@ class OrchestratorApp:
         ru_icon_label = ttk.Label(ru_icon_row, text="(ninguno)", style="Dim.TLabel")
         ru_icon_label.pack(side=tk.LEFT, padx=(4, 0), fill=tk.X, expand=True)
 
+        # ── Preview de la imagen ──
+        ru_preview_frame = ttk.Frame(ru_frame)
+        ru_preview_frame.pack(fill=tk.X, pady=(4, 0))
+        ru_preview_label = ttk.Label(ru_preview_frame, text="", background=DARK_COLORS["bg"])
+
+        def _update_ru_preview():
+            """Carga y muestra thumbnail de la imagen seleccionada."""
+            path = ru_icon_var.get()
+            if path and os.path.isfile(path):
+                try:
+                    from PIL import Image, ImageTk
+                    img = Image.open(path)
+                    img.thumbnail((100, 80), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    ru_preview_label.configure(image=photo, text="")
+                    ru_preview_label._photo_ref = photo
+                    ru_preview_label.pack(pady=(2, 0))
+                except Exception:
+                    ru_preview_label.pack_forget()
+            else:
+                ru_preview_label.pack_forget()
+
         def _pick_ru_icon():
             p = filedialog.askopenfilename(
                 title="Seleccionar icono de referencia",
@@ -1627,6 +1649,7 @@ class OrchestratorApp:
             if p:
                 ru_icon_var.set(p)
                 ru_icon_label.config(text=os.path.basename(p))
+                _update_ru_preview()
 
         def _capture_ru_region():
             """Capturar región de pantalla como icono — soporte multi-monitor."""
@@ -1696,6 +1719,7 @@ class OrchestratorApp:
                     cropped.save(save_path)
                     ru_icon_var.set(save_path)
                     ru_icon_label.config(text=fname)
+                    _update_ru_preview()
 
                 canvas.bind("<ButtonPress-1>", on_down)
                 canvas.bind("<B1-Motion>", on_drag)
@@ -1766,11 +1790,9 @@ class OrchestratorApp:
                         try:
                             if isinstance(child, ttk.Spinbox):
                                 if enabled:
-                                    child.configure(state="normal")
+                                    child.configure(state="normal", fieldbackground=c["surface_alt"])
                                 else:
-                                    child.configure(state="readonly")
-                                    # Forzar fondo oscuro tras cambio de estado (Windows clam theme bug)
-                                    child.configure(fieldbackground=c["surface_alt"])
+                                    child.configure(state="readonly", fieldbackground=c["surface_alt"])
                             elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
                                 child.configure(state="normal" if enabled else "disabled")
                         except Exception:
@@ -1898,6 +1920,32 @@ class OrchestratorApp:
         ru_icon_label = ttk.Label(ru_icon_row, text=ru_icon_label_text, style="Dim.TLabel")
         ru_icon_label.pack(side=tk.LEFT, padx=(4, 0), fill=tk.X, expand=True)
 
+        # ── Preview de la imagen ──
+        ru_preview_frame = ttk.Frame(ru_frame)
+        ru_preview_frame.pack(fill=tk.X, pady=(4, 0))
+        ru_preview_label = ttk.Label(ru_preview_frame, text="", background=DARK_COLORS["bg"])
+
+        def _update_ru_preview():
+            """Carga y muestra thumbnail de la imagen seleccionada."""
+            path = ru_icon_var.get()
+            if path and os.path.isfile(path):
+                try:
+                    from PIL import Image, ImageTk
+                    img = Image.open(path)
+                    img.thumbnail((100, 80), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    ru_preview_label.configure(image=photo, text="")
+                    ru_preview_label._photo_ref = photo
+                    ru_preview_label.pack(pady=(2, 0))
+                except Exception:
+                    ru_preview_label.pack_forget()
+            else:
+                ru_preview_label.pack_forget()
+
+        # Mostrar preview inicial si ya hay icono
+        if existing_icon:
+            _update_ru_preview()
+
         def _pick_ru_icon():
             p = filedialog.askopenfilename(
                 title="Seleccionar icono de referencia",
@@ -1905,6 +1953,7 @@ class OrchestratorApp:
             if p:
                 ru_icon_var.set(p)
                 ru_icon_label.config(text=os.path.basename(p))
+                _update_ru_preview()
 
         def _capture_ru_region():
             """Capturar región de pantalla como icono — soporte multi-monitor."""
@@ -1974,6 +2023,7 @@ class OrchestratorApp:
                     cropped.save(save_path)
                     ru_icon_var.set(save_path)
                     ru_icon_label.config(text=fname)
+                    _update_ru_preview()
 
                 canvas.bind("<ButtonPress-1>", on_down)
                 canvas.bind("<B1-Motion>", on_drag)
@@ -2044,11 +2094,9 @@ class OrchestratorApp:
                         try:
                             if isinstance(child, ttk.Spinbox):
                                 if enabled:
-                                    child.configure(state="normal")
+                                    child.configure(state="normal", fieldbackground=c["surface_alt"])
                                 else:
-                                    child.configure(state="readonly")
-                                    # Forzar fondo oscuro tras cambio de estado (Windows clam theme bug)
-                                    child.configure(fieldbackground=c["surface_alt"])
+                                    child.configure(state="readonly", fieldbackground=c["surface_alt"])
                             elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
                                 child.configure(state="normal" if enabled else "disabled")
                         except Exception:
