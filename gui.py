@@ -357,11 +357,15 @@ class OrchestratorApp:
         self.root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
         style.configure("TSpinbox", fieldbackground=c["surface_alt"],
                         foreground=c["text"], bordercolor=c["border"],
-                        borderwidth=1, arrowcolor=c["text"])
+                        borderwidth=1, arrowcolor=c["text"],
+                        background=c["surface_alt"])
         style.map("TSpinbox",
                   fieldbackground=[("disabled", c["surface_alt"]),
                                   ("readonly", c["surface_alt"])],
-                  foreground=[("disabled", c["text_dim"])])
+                  foreground=[("disabled", c["text_dim"]),
+                             ("readonly", c["text"])],
+                  background=[("disabled", c["surface_alt"]),
+                             ("readonly", c["surface_alt"])])
 
         # ── Compact styles (para ttk fallback) ──
         style.configure("Compact.TButton", padding=4, font=("Segoe UI", 9),
@@ -1747,17 +1751,27 @@ class OrchestratorApp:
 
         def _toggle_ru_widgets(*args):
             enabled = ru_enabled_var.get()
+            c = DARK_COLORS
             def _set_state(widget):
                 for child in widget.winfo_children():
+                    # No deshabilitar el checkbox "Activar" (se bloquearía a sí mismo)
+                    try:
+                        if hasattr(child, 'cget') and child.cget('variable') in (ru_enabled_var, str(ru_enabled_var)):
+                            continue
+                    except Exception:
+                        pass
                     if isinstance(child, ttk.Frame):
                         _set_state(child)
                     else:
                         try:
                             if isinstance(child, ttk.Spinbox):
-                                child.configure(state="normal" if enabled else "readonly")
+                                if enabled:
+                                    child.configure(state="normal")
+                                else:
+                                    child.configure(state="readonly")
+                                    # Forzar fondo oscuro tras cambio de estado (Windows clam theme bug)
+                                    child.configure(fieldbackground=c["surface_alt"])
                             elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
-                                child.configure(state="normal" if enabled else "disabled")
-                            else:
                                 child.configure(state="normal" if enabled else "disabled")
                         except Exception:
                             pass
@@ -2015,17 +2029,27 @@ class OrchestratorApp:
 
         def _toggle_ru_widgets(*args):
             enabled = ru_enabled_var.get()
+            c = DARK_COLORS
             def _set_state(widget):
                 for child in widget.winfo_children():
+                    # No deshabilitar el checkbox "Activar" (se bloquearía a sí mismo)
+                    try:
+                        if hasattr(child, 'cget') and child.cget('variable') in (ru_enabled_var, str(ru_enabled_var)):
+                            continue
+                    except Exception:
+                        pass
                     if isinstance(child, ttk.Frame):
                         _set_state(child)
                     else:
                         try:
                             if isinstance(child, ttk.Spinbox):
-                                child.configure(state="normal" if enabled else "readonly")
+                                if enabled:
+                                    child.configure(state="normal")
+                                else:
+                                    child.configure(state="readonly")
+                                    # Forzar fondo oscuro tras cambio de estado (Windows clam theme bug)
+                                    child.configure(fieldbackground=c["surface_alt"])
                             elif isinstance(child, (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Combobox)):
-                                child.configure(state="normal" if enabled else "disabled")
-                            else:
                                 child.configure(state="normal" if enabled else "disabled")
                         except Exception:
                             pass
