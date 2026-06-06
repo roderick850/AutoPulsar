@@ -4,7 +4,7 @@ import time
 import os
 
 try:
-    from icon_detector import check_conditions
+    from icon_detector import check_conditions, check_icon
     HAS_ICON_DETECTOR = True
 except ImportError:
     HAS_ICON_DETECTOR = False
@@ -82,70 +82,139 @@ class Executor(threading.Thread):
                 conditions = item.get("conditions", {})
                 has_conditions = bool(conditions and conditions.get("items") and HAS_ICON_DETECTOR)
 
-                self._safe_callback("on_start_item", idx, name, reps)
+                # ── Repeat-until condition mode ──
+                repeat_until = item.get("repeat_until_enabled", False)
+                ru_icon = item.get("repeat_until_icon", "")
+                ru_mode = item.get("repeat_until_mode", "match")
+                ru_threshold = item.get("repeat_until_threshold", 0.05)
+                ru_max = item.get("repeat_until_max_iterations", 99999)
+                ru_interval = item.get("repeat_until_check_interval", 0.5)
+                # 0 = unlimited (no max)
+                ru_unlimited = (ru_max == 0)
 
-                for r in range(reps):
-                    if self.stop_event.is_set():
-                        break
+                if repeat_until and HAS_ICON_DETECTOR and ru_icon:
+                    mode_label = f"(hasta {'encontrar' if ru_mode == 'match' else 'desaparecer'} icono)"
+                else:
+                    mode_label = ""
 
-                    # ── Verificar condiciones ANTES de cada repetición ──
-                    if has_conditions:
-                        ok = self._check_conditions_with_retry(
-                            conditions, idx, item)
-                        if not ok:
-                            # Condición falló → script de recuperación ejecutado
-                            # o simplemente saltado. Detener repeticiones.
-                            break  # salir del for de reps, pasar al siguiente script
-                        else:
-                            # Condición cumplida → resetear contador de fallos
-                            item["_consecutive_failures"] = 0
+                self._safe_callback("on_start_item", idx, name,
+                    None if repeat_until else reps,
+                    mode_label)
 
-                    self._safe_callback(
-                        "on_repeat",
-                        completed_reps_total + 1,
-                        total_global_reps,
-                        total_reps_per_loop,
-                        name,
-                        r + 1,
-                        reps,
-                        current_loop,
-                        max_loops,
-                    )
+                if repeat_until and HAS_ICON_DETECTOR and ru_icon:
+                    # ── LOOP UNTIL CONDITION ──
+                    iteration = 0
+                    while (ru_unlimited or iteration < ru_max) and not self.stop_event.is_set():
+                        iteration += 1
 
-                    try:
-                        self.launch_event.clear()
-                        self._safe_callback("on_launch", item["path"])
-                        if not self.launch_event.wait(timeout=10):
-                            raise TimeoutError("El hilo principal no pudo lanzar el .exe")
+                        if ru_interval > 0 and iteration > 1:
+                            slept = 0.0
+                            while slept < ru_interval and not self.stop_event.is_set():
+                                time.sleep(0.1)
+                                slept += 0.1
 
-                        # Buffer: give Windows time to create and show the process window
-                        time.sleep(2.0)
-                    except Exception as e:
-                        self._safe_callback("on_error", str(e))
-                        break
+                        if self.stop_event.is_set():
+                            break
 
-                    # Count the repetition NOW (after successful launch, before duration)
-                    completed_reps_total += 1
+                        self._safe_callback(
+                            "on_repeat",
+                            completed_reps_total + 1,
+                            total_global_reps,
+                            total_reps_per_loop,
+                            name,
+                            iteration,
+                            ru_max,
+                            current_loop,
+                            max_loops,
+                        )
 
-                    # Wait the configured duration (checking stop frequently)
-                    interval = 0.1
-                    slept = 0.0
-                    while slept < duration and not self.stop_event.is_set():
-                        time.sleep(interval)
-                        slept += interval
+                        try:
+                            self.launch_event.clear()
+                            self._safe_callback("on_launch", item["path"])
+                            if not self.launch_event.wait(timeout=10):
+                                raise TimeoutError("El hilo principal no pudo lanzar el .exe")
+                            time.sleep(2.0)
+                        except Exception as e:
+                            self._safe_callback("on_error", str(e))
+                            break
 
-                    if self.stop_event.is_set():
-                        break
+                        completed_reps_total += 1
 
-                    # Pause between repetitions (except after the last one)
-                    if r < reps - 1 and pause > 0:
                         slept = 0.0
-                        while slept < pause and not self.stop_event.is_set():
-                            time.sleep(interval)
-                            slept += interval
+                        while slept < duration and not self.stop_event.is_set():
+                            time.sleep(0.1)
+                            slept += 0.1
 
-                    if self.stop_event.is_set():
-                        break
+                        if self.stop_event.is_set():
+                            break
+
+                        # ── Check the repeat-until condition ──
+                        found = check_icon(ru_icon, None, ru_threshold)
+                        condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
+
+                        self._safe_callback("on_repeat_until_check", idx, name,
+                            iteration, ru_max, found, condition_met)
+
+                        if condition_met:
+                            self._safe_callback("on_repeat_until_done", idx, name, iteration)
+                            break
+
+                    if not ru_unlimited and iteration >= ru_max and not self.stop_event.is_set():
+                        self._safe_callback("on_repeat_until_max", idx, name, ru_max)
+
+                else:
+                    # ── FIXED REPETITIONS ──
+                    for r in range(reps):
+                        if self.stop_event.is_set():
+                            break
+
+                        # ── Verificar condiciones ANTES de cada repetición ──
+                        if has_conditions:
+                            ok = self._check_conditions_with_retry(
+                                conditions, idx, item)
+                            if not ok:
+                                break
+
+                        self._safe_callback(
+                            "on_repeat",
+                            completed_reps_total + 1,
+                            total_global_reps,
+                            total_reps_per_loop,
+                            name,
+                            r + 1,
+                            reps,
+                            current_loop,
+                            max_loops,
+                        )
+
+                        try:
+                            self.launch_event.clear()
+                            self._safe_callback("on_launch", item["path"])
+                            if not self.launch_event.wait(timeout=10):
+                                raise TimeoutError("El hilo principal no pudo lanzar el .exe")
+                            time.sleep(2.0)
+                        except Exception as e:
+                            self._safe_callback("on_error", str(e))
+                            break
+
+                        completed_reps_total += 1
+
+                        slept = 0.0
+                        while slept < duration and not self.stop_event.is_set():
+                            time.sleep(0.1)
+                            slept += 0.1
+
+                        if self.stop_event.is_set():
+                            break
+
+                        if r < reps - 1 and pause > 0:
+                            slept = 0.0
+                            while slept < pause and not self.stop_event.is_set():
+                                time.sleep(0.1)
+                                slept += 0.1
+
+                        if self.stop_event.is_set():
+                            break
 
             # Delay between full loops (except after the last loop)
             if (max_loops is None or current_loop < max_loops) and loop_delay > 0:

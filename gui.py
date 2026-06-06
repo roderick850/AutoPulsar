@@ -26,12 +26,12 @@ def format_time(seconds):
 
 # ── Dark Theme Colors (synced with CTk "dark-blue" palette) ──────
 DARK_COLORS = {
-    "bg":           "#1a1a1a",   # main window bg
-    "surface":      "#242424",   # CTkFrame fg_color
-    "surface_alt":  "#2d2d2d",   # Treeview row bg
-    "border":       "#474747",   # subtle borders
-    "text":         "#d6d6d6",   # primary text
-    "text_dim":     "#8a8a8a",   # secondary text
+    "bg":           "#0d0d0d",   # main window bg — deep black
+    "surface":      "#1a1a1a",   # CTkFrame fg_color
+    "surface_alt":  "#212121",   # Treeview row bg
+    "border":       "#3a3a3a",   # subtle borders
+    "text":         "#e0e0e0",   # primary text
+    "text_dim":     "#808080",   # secondary text
     "accent":       "#1f538d",   # CTkButton blue
     "accent_hover": "#14375e",   # button hover
     "green":        "#2e8b57",   # success / ready
@@ -40,9 +40,9 @@ DARK_COLORS = {
     "yellow":       "#c4a43d",   # warning
     "blue":         "#3a7ebf",   # running
     "purple":       "#7c5cbf",   # waiting
-    "menu_bg":      "#1a1a1a",   # menu bar background
-    "menu_fg":      "#d6d6d6",   # menu bar text
-    "menu_active":  "#333333",   # menu hover
+    "menu_bg":      "#0d0d0d",   # menu bar background
+    "menu_fg":      "#e0e0e0",   # menu bar text
+    "menu_active":  "#2a2a2a",   # menu hover
 }
 
 
@@ -300,6 +300,12 @@ class OrchestratorApp:
 
         c = DARK_COLORS
         style = ttk.Style()
+        # Use clam theme — fully custom-drawn, respects background/foreground colors
+        # (Windows default themes ignore custom widget colors)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass  # fallback to default if clam not available
 
         # ── Treeview (sigue siendo ttk, colores sincronizados) ──
         style.configure("Treeview",
@@ -320,6 +326,11 @@ class OrchestratorApp:
         style.configure("TScrollbar", background=c["surface"],
                         troughcolor=c["bg"], bordercolor=c["bg"],
                         arrowcolor=c["text_dim"], borderwidth=0)
+        style.map("TScrollbar",
+                  background=[("active", c["surface_alt"])])
+
+        # ── Separator ──
+        style.configure("TSeparator", background=c["border"])
 
         # ── LabelFrame (ttk, se usa en editor de condiciones) ──
         style.configure("TLabelframe", background=c["bg"], foreground=c["text"],
@@ -332,17 +343,69 @@ class OrchestratorApp:
                         foreground=c["text"], background=c["surface_alt"],
                         arrowcolor=c["text"], bordercolor=c["border"])
         style.map("TCombobox",
-                  fieldbackground=[("readonly", c["surface_alt"])],
-                  foreground=[("readonly", c["text"])])
+                  fieldbackground=[("readonly", c["surface_alt"]),
+                                  ("focus", c["surface"]),
+                                  ("active", c["surface"])],
+                  foreground=[("readonly", c["text"]),
+                             ("focus", c["text"])],
+                  selectbackground=[("readonly", c["accent"])],
+                  selectforeground=[("readonly", "#ffffff")])
+        # Force the Combobox dropdown list to use dark colors
+        self.root.option_add("*TCombobox*Listbox.background", c["surface_alt"])
+        self.root.option_add("*TCombobox*Listbox.foreground", c["text"])
+        self.root.option_add("*TCombobox*Listbox.selectBackground", c["accent"])
+        self.root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
         style.configure("TSpinbox", fieldbackground=c["surface_alt"],
                         foreground=c["text"], bordercolor=c["border"],
                         borderwidth=1, arrowcolor=c["text"])
 
         # ── Compact styles (para ttk fallback) ──
-        style.configure("Compact.TButton", padding=4, font=("Segoe UI", 9))
+        style.configure("Compact.TButton", padding=4, font=("Segoe UI", 9),
+                        background=c["surface"], foreground=c["text"],
+                        borderwidth=1, bordercolor=c["border"])
+        style.map("Compact.TButton",
+                  background=[("active", c["accent"]), ("pressed", c["accent_hover"])],
+                  foreground=[("active", "#ffffff"), ("pressed", "#ffffff")])
         style.configure("Dim.TLabel", foreground=c["text_dim"], background=c["bg"])
+        style.configure("Bold.TLabel", foreground=c["text"], background=c["bg"],
+                        font=("Segoe UI", 10, "bold"))
         style.configure("TLabel", background=c["bg"], foreground=c["text"])
         style.configure("TFrame", background=c["bg"])
+
+        # ── Entry (campos de texto) ──
+        style.configure("TEntry", fieldbackground=c["surface_alt"],
+                        foreground=c["text"], bordercolor=c["border"],
+                        borderwidth=1)
+
+        # ── Progressbar ──
+        style.configure("TProgressbar", background=c["accent"],
+                        troughcolor=c["surface_alt"], bordercolor=c["border"],
+                        darkcolor=c["accent"], lightcolor=c["accent"])
+
+        # ── Base Button style (fallback for all ttk buttons) ──
+        style.configure("TButton", background=c["surface"],
+                        foreground=c["text"], borderwidth=1,
+                        bordercolor=c["border"], padding=4,
+                        font=("Segoe UI", 9))
+        style.map("TButton",
+                  background=[("active", c["accent"]), ("pressed", c["accent_hover"]),
+                             ("disabled", c["surface_alt"])],
+                  foreground=[("active", "#ffffff"), ("pressed", "#ffffff"),
+                             ("disabled", c["text_dim"])])
+
+        # ── Checkbutton / Radiobutton ──
+        style.configure("TCheckbutton", background=c["bg"],
+                        foreground=c["text"])
+        style.map("TCheckbutton",
+                  background=[("active", c["bg"]), ("selected", c["bg"])])
+        style.configure("TRadiobutton", background=c["bg"],
+                        foreground=c["text"])
+        style.map("TRadiobutton",
+                  background=[("active", c["bg"]), ("selected", c["bg"])])
+
+        # ── Menubar (fallback si CTk no lo cubre) ──
+        style.configure("TMenubutton", background=c["menu_bg"],
+                        foreground=c["menu_fg"])
 
     def _build_ui(self):
         c = DARK_COLORS
@@ -691,6 +754,7 @@ class OrchestratorApp:
             icono = "🖼️" if item.get("icon_path", "") else ""
             n_cond = len(item.get("conditions", {}).get("items", []))
             cond_text = f"⚙️{n_cond}" if n_cond else ""
+            repeat_until_mark = "🔄" if item.get("repeat_until_enabled") and item.get("repeat_until_icon") else ""
 
             if group:
                 parts = group.split("/")
@@ -718,7 +782,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     parent_iid, tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, cond_text, f"{indent}{os.path.basename(item['path'])}",
+                    values=(idx + 1, check, primero, cond_text, f"{indent}{repeat_until_mark}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_grouped"))
@@ -727,7 +791,7 @@ class OrchestratorApp:
                 script_iid = self.tree.insert(
                     "", tk.END,
                     text=" ",
-                    values=(idx + 1, check, primero, cond_text, os.path.basename(item["path"]),
+                    values=(idx + 1, check, primero, cond_text, f"{repeat_until_mark}{os.path.basename(item['path'])}",
                             item["repetitions"], item["duration"],
                             item["pause"], format_time(item_time)),
                     tags=("script_ungrouped"))
@@ -1482,7 +1546,7 @@ class OrchestratorApp:
 
         win = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         win.title("Agregar script")
-        win.geometry("300x260")
+        win.geometry("360x460")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
@@ -1496,7 +1560,7 @@ class OrchestratorApp:
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"300x260+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        win.geometry(f"360x460+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
@@ -1521,30 +1585,169 @@ class OrchestratorApp:
         pause_var = tk.IntVar(value=0)
         ttk.Spinbox(row3, from_=0, to=9999, textvariable=pause_var, width=8).pack(side=tk.RIGHT)
 
+        # ── Repeat-until section ──
+        ru_frame = ttk.LabelFrame(form, text="🔄 Repetir hasta condición (icono)", padding=8)
+        ru_frame.pack(fill=tk.X, pady=(8, 4))
+
+        ru_enabled_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ru_frame, text="Activar", variable=ru_enabled_var).pack(anchor=tk.W)
+
+        ru_mode_var = tk.StringVar(value="match")
+        ru_mode_frame = ttk.Frame(ru_frame)
+        ru_mode_frame.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_mode_frame, text="Detener al:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ttk.Radiobutton(ru_mode_frame, text="Encontrar", variable=ru_mode_var,
+                        value="match").pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Radiobutton(ru_mode_frame, text="Desaparecer", variable=ru_mode_var,
+                        value="no_match").pack(side=tk.LEFT, padx=2)
+
+        ru_icon_var = tk.StringVar(value="")
+        ru_icon_row = ttk.Frame(ru_frame)
+        ru_icon_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_icon_row, text="Icono:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ru_icon_label = ttk.Label(ru_icon_row, text="(ninguno)", style="Dim.TLabel")
+        ru_icon_label.pack(side=tk.LEFT, padx=(4, 0), fill=tk.X, expand=True)
+
+        def _pick_ru_icon():
+            p = filedialog.askopenfilename(
+                title="Seleccionar icono de referencia",
+                filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.bmp"), ("Todos", "*.*")])
+            if p:
+                ru_icon_var.set(p)
+                ru_icon_label.config(text=os.path.basename(p))
+
+        def _capture_ru_region():
+            """Capturar región de pantalla como icono (igual que en condiciones)."""
+            from icon_detector import HAS_MSS
+            from PIL import Image, ImageTk
+            import time as _time
+            try:
+                if HAS_MSS:
+                    import mss
+                    with mss.mss() as sct:
+                        monitor = sct.monitors[1]
+                        screen = sct.grab(monitor)
+                        img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
+                else:
+                    from PIL import ImageGrab
+                    img = ImageGrab.grab(all_screens=True)
+            except Exception:
+                from PIL import ImageGrab
+                img = ImageGrab.grab(all_screens=True)
+
+            cap_win = ctk.CTkToplevel(win, fg_color="black")
+            cap_win.attributes("-fullscreen", True)
+            cap_win.attributes("-topmost", True)
+            cap_win.configure(cursor="crosshair")
+
+            photo = ImageTk.PhotoImage(img)
+            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+            canvas.pack(fill=tk.BOTH, expand=True)
+            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+            canvas._photo_ref = photo
+
+            rect = None
+            start = [0, 0]
+
+            def on_down(e):
+                start[0], start[1] = e.x, e.y
+                nonlocal rect
+                if rect:
+                    canvas.delete(rect)
+                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                    outline="#7c7cf8", width=2, dash=(4, 2))
+
+            def on_drag(e):
+                nonlocal rect
+                if rect:
+                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+
+            def on_up(e):
+                x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                cap_win.destroy()
+                if x2 - x1 < 10 or y2 - y1 < 10:
+                    return
+                cropped = img.crop((x1, y1, x2, y2))
+                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                os.makedirs(icons_dir, exist_ok=True)
+                fname = f"ru_{int(_time.time())}.png"
+                save_path = os.path.join(icons_dir, fname)
+                cropped.save(save_path)
+                ru_icon_var.set(save_path)
+                ru_icon_label.config(text=fname)
+
+            canvas.bind("<ButtonPress-1>", on_down)
+            canvas.bind("<B1-Motion>", on_drag)
+            canvas.bind("<ButtonRelease-1>", on_up)
+            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
+            canvas.create_text(img.width // 2, 30,
+                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+        btn_row = ttk.Frame(ru_icon_row)
+        btn_row.pack(side=tk.RIGHT)
+        ttk.Button(btn_row, text="📸", width=3, command=_capture_ru_region).pack(side=tk.LEFT, padx=(0, 2))
+        ttk.Button(btn_row, text="📁", width=3, command=_pick_ru_icon).pack(side=tk.LEFT)
+
+        ru_max_row = ttk.Frame(ru_frame)
+        ru_max_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_max_row, text="Máx. intentos:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ru_max_var = tk.IntVar(value=0)
+        ttk.Spinbox(ru_max_row, from_=0, to=99999, textvariable=ru_max_var, width=8).pack(side=tk.RIGHT)
+        ttk.Label(ru_max_row, text="(0=sin límite)", style="Dim.TLabel").pack(side=tk.RIGHT, padx=(4, 0))
+
+        ru_thresh_row = ttk.Frame(ru_frame)
+        ru_thresh_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_thresh_row, text="Tolerancia (0-1):", style="Compact.TLabel").pack(side=tk.LEFT)
+        ru_thresh_var = tk.DoubleVar(value=0.05)
+        ttk.Spinbox(ru_thresh_row, from_=0.01, to=1.0, increment=0.01,
+                    textvariable=ru_thresh_var, width=8).pack(side=tk.RIGHT)
+
+        def _toggle_ru_widgets(*args):
+            state = "normal" if ru_enabled_var.get() else "disabled"
+            for child in ru_frame.winfo_children():
+                if isinstance(child, ttk.Frame):
+                    for sub in child.winfo_children():
+                        try: sub.configure(state=state)
+                        except: pass
+
+        ru_enabled_var.trace_add("write", _toggle_ru_widgets)
+
         time_preview = ttk.Label(form, text="Tiempo: 10s", style="Dim.TLabel")
-        time_preview.pack(pady=(0, 8))
+        time_preview.pack(pady=(8, 0))
 
         def update_preview(*args):
-            total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
-            total = max(total, 0)
-            time_preview.config(text=f"Tiempo: {format_time(total)}")
+            if ru_enabled_var.get():
+                time_preview.config(text="Tiempo: variable (según condición)")
+            else:
+                total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
+                total = max(total, 0)
+                time_preview.config(text=f"Tiempo: {format_time(total)}")
 
         reps_var.trace_add("write", update_preview)
         dur_var.trace_add("write", update_preview)
         pause_var.trace_add("write", update_preview)
+        ru_enabled_var.trace_add("write", update_preview)
 
         def save():
-            self.playlist.append(
-                {
-                    "path": path,
-                    "repetitions": reps_var.get(),
-                    "duration": dur_var.get(),
-                    "pause": pause_var.get(),
-                    "enabled": True,
-                    "first_loop_only": False,
-                    "group": None,
-                }
-            )
+            item = {
+                "path": path,
+                "repetitions": reps_var.get(),
+                "duration": dur_var.get(),
+                "pause": pause_var.get(),
+                "enabled": True,
+                "first_loop_only": False,
+                "group": None,
+            }
+            if ru_enabled_var.get() and ru_icon_var.get():
+                item["repeat_until_enabled"] = True
+                item["repeat_until_mode"] = ru_mode_var.get()
+                item["repeat_until_icon"] = ru_icon_var.get()
+                item["repeat_until_threshold"] = ru_thresh_var.get()
+                item["repeat_until_max_iterations"] = ru_max_var.get()
+                item["repeat_until_check_interval"] = 0.5
+            self.playlist.append(item)
             self._refresh_list()
             win.destroy()
 
@@ -1564,7 +1767,7 @@ class OrchestratorApp:
 
         win = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         win.title("Editar script")
-        win.geometry("300x280")
+        win.geometry("360x460")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
@@ -1578,7 +1781,7 @@ class OrchestratorApp:
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"300x280+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        win.geometry(f"360x460+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
@@ -1603,23 +1806,170 @@ class OrchestratorApp:
         pause_var = tk.IntVar(value=item["pause"])
         ttk.Spinbox(row3, from_=0, to=9999, textvariable=pause_var, width=8).pack(side=tk.RIGHT)
 
+        # ── Repeat-until section ──
+        ru_frame = ttk.LabelFrame(form, text="🔄 Repetir hasta condición (icono)", padding=8)
+        ru_frame.pack(fill=tk.X, pady=(8, 4))
+
+        ru_enabled_var = tk.BooleanVar(value=item.get("repeat_until_enabled", False))
+        ttk.Checkbutton(ru_frame, text="Activar", variable=ru_enabled_var).pack(anchor=tk.W)
+
+        ru_mode_var = tk.StringVar(value=item.get("repeat_until_mode", "match"))
+        ru_mode_frame = ttk.Frame(ru_frame)
+        ru_mode_frame.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_mode_frame, text="Detener al:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ttk.Radiobutton(ru_mode_frame, text="Encontrar", variable=ru_mode_var,
+                        value="match").pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Radiobutton(ru_mode_frame, text="Desaparecer", variable=ru_mode_var,
+                        value="no_match").pack(side=tk.LEFT, padx=2)
+
+        existing_icon = item.get("repeat_until_icon", "")
+        ru_icon_var = tk.StringVar(value=existing_icon)
+        ru_icon_row = ttk.Frame(ru_frame)
+        ru_icon_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_icon_row, text="Icono:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ru_icon_label_text = os.path.basename(existing_icon) if existing_icon else "(ninguno)"
+        ru_icon_label = ttk.Label(ru_icon_row, text=ru_icon_label_text, style="Dim.TLabel")
+        ru_icon_label.pack(side=tk.LEFT, padx=(4, 0), fill=tk.X, expand=True)
+
+        def _pick_ru_icon():
+            p = filedialog.askopenfilename(
+                title="Seleccionar icono de referencia",
+                filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.bmp"), ("Todos", "*.*")])
+            if p:
+                ru_icon_var.set(p)
+                ru_icon_label.config(text=os.path.basename(p))
+
+        def _capture_ru_region():
+            """Capturar región de pantalla como icono."""
+            from icon_detector import HAS_MSS
+            from PIL import Image, ImageTk
+            import time as _time
+            try:
+                if HAS_MSS:
+                    import mss
+                    with mss.mss() as sct:
+                        monitor = sct.monitors[1]
+                        screen = sct.grab(monitor)
+                        img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
+                else:
+                    from PIL import ImageGrab
+                    img = ImageGrab.grab(all_screens=True)
+            except Exception:
+                from PIL import ImageGrab
+                img = ImageGrab.grab(all_screens=True)
+
+            cap_win = ctk.CTkToplevel(win, fg_color="black")
+            cap_win.attributes("-fullscreen", True)
+            cap_win.attributes("-topmost", True)
+            cap_win.configure(cursor="crosshair")
+
+            photo = ImageTk.PhotoImage(img)
+            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+            canvas.pack(fill=tk.BOTH, expand=True)
+            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+            canvas._photo_ref = photo
+
+            rect = None
+            start = [0, 0]
+
+            def on_down(e):
+                start[0], start[1] = e.x, e.y
+                nonlocal rect
+                if rect:
+                    canvas.delete(rect)
+                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                    outline="#7c7cf8", width=2, dash=(4, 2))
+
+            def on_drag(e):
+                nonlocal rect
+                if rect:
+                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+
+            def on_up(e):
+                x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                cap_win.destroy()
+                if x2 - x1 < 10 or y2 - y1 < 10:
+                    return
+                cropped = img.crop((x1, y1, x2, y2))
+                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                os.makedirs(icons_dir, exist_ok=True)
+                fname = f"ru_{int(_time.time())}.png"
+                save_path = os.path.join(icons_dir, fname)
+                cropped.save(save_path)
+                ru_icon_var.set(save_path)
+                ru_icon_label.config(text=fname)
+
+            canvas.bind("<ButtonPress-1>", on_down)
+            canvas.bind("<B1-Motion>", on_drag)
+            canvas.bind("<ButtonRelease-1>", on_up)
+            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
+            canvas.create_text(img.width // 2, 30,
+                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+        btn_row = ttk.Frame(ru_icon_row)
+        btn_row.pack(side=tk.RIGHT)
+        ttk.Button(btn_row, text="📸", width=3, command=_capture_ru_region).pack(side=tk.LEFT, padx=(0, 2))
+        ttk.Button(btn_row, text="📁", width=3, command=_pick_ru_icon).pack(side=tk.LEFT)
+
+        ru_max_var = tk.IntVar(value=item.get("repeat_until_max_iterations", 0))
+        ru_max_row = ttk.Frame(ru_frame)
+        ru_max_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_max_row, text="Máx. intentos:", style="Compact.TLabel").pack(side=tk.LEFT)
+        ttk.Spinbox(ru_max_row, from_=0, to=99999, textvariable=ru_max_var, width=8).pack(side=tk.RIGHT)
+        ttk.Label(ru_max_row, text="(0=sin límite)", style="Dim.TLabel").pack(side=tk.RIGHT, padx=(4, 0))
+
+        ru_thresh_var = tk.DoubleVar(value=item.get("repeat_until_threshold", 0.05))
+        ru_thresh_row = ttk.Frame(ru_frame)
+        ru_thresh_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(ru_thresh_row, text="Tolerancia (0-1):", style="Compact.TLabel").pack(side=tk.LEFT)
+        ttk.Spinbox(ru_thresh_row, from_=0.01, to=1.0, increment=0.01,
+                    textvariable=ru_thresh_var, width=8).pack(side=tk.RIGHT)
+
+        def _toggle_ru_widgets(*args):
+            state = "normal" if ru_enabled_var.get() else "disabled"
+            for child in ru_frame.winfo_children():
+                if isinstance(child, ttk.Frame):
+                    for sub in child.winfo_children():
+                        try: sub.configure(state=state)
+                        except: pass
+
+        ru_enabled_var.trace_add("write", _toggle_ru_widgets)
+
         time_preview = ttk.Label(form, text=f"Tiempo: {format_time(self._calc_item_time(item))}", style="Dim.TLabel")
-        time_preview.pack(pady=(0, 8))
+        time_preview.pack(pady=(8, 0))
 
         def update_preview(*args):
-            total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
-            total = max(total, 0)
-            time_preview.config(text=f"Tiempo: {format_time(total)}")
+            if ru_enabled_var.get():
+                time_preview.config(text="Tiempo: variable (según condición)")
+            else:
+                total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
+                total = max(total, 0)
+                time_preview.config(text=f"Tiempo: {format_time(total)}")
 
         reps_var.trace_add("write", update_preview)
         dur_var.trace_add("write", update_preview)
         pause_var.trace_add("write", update_preview)
+        ru_enabled_var.trace_add("write", update_preview)
 
         def save():
             # Preservar todos los campos existentes, solo actualizar los editables
             item["repetitions"] = reps_var.get()
             item["duration"] = dur_var.get()
             item["pause"] = pause_var.get()
+            if ru_enabled_var.get() and ru_icon_var.get():
+                item["repeat_until_enabled"] = True
+                item["repeat_until_mode"] = ru_mode_var.get()
+                item["repeat_until_icon"] = ru_icon_var.get()
+                item["repeat_until_threshold"] = ru_thresh_var.get()
+                item["repeat_until_max_iterations"] = ru_max_var.get()
+                item["repeat_until_check_interval"] = 0.5
+            else:
+                for key in ("repeat_until_enabled", "repeat_until_mode", "repeat_until_icon",
+                           "repeat_until_threshold", "repeat_until_max_iterations",
+                           "repeat_until_check_interval"):
+                    item.pop(key, None)
             self._refresh_list()
             win.destroy()
 
@@ -2146,14 +2496,23 @@ class OrchestratorApp:
             "on_start_loop": lambda current, max_loops, total_global: self.root.after(
                 0, lambda: self._cb_start_loop(current, max_loops, total_global)
             ),
-            "on_start_item": lambda idx, name, reps: self.root.after(
-                0, lambda: self._cb_start_item(idx, name, reps)
+            "on_start_item": lambda idx, name, reps, mode_label="": self.root.after(
+                0, lambda: self._cb_start_item(idx, name, reps, mode_label)
             ),
             "on_repeat": lambda global_rep, total_global, total_per_loop, name, current, total_item, loop, max_loops: self.root.after(
                 0,
                 lambda: self._cb_repeat(
                     global_rep, total_global, total_per_loop, name, current, total_item, loop, max_loops
                 )),
+            "on_repeat_until_check": lambda idx, name, iteration, ru_max, found, condition_met: self.root.after(
+                0, lambda: self._cb_repeat_until_check(idx, name, iteration, ru_max, found, condition_met)
+            ),
+            "on_repeat_until_done": lambda idx, name, iteration: self.root.after(
+                0, lambda: self._cb_repeat_until_done(idx, name, iteration)
+            ),
+            "on_repeat_until_max": lambda idx, name, ru_max: self.root.after(
+                0, lambda: self._cb_repeat_until_max(idx, name, ru_max)
+            ),
             "on_loop_delay": lambda current, delay, total_global: self.root.after(
                 0, lambda: self._cb_loop_delay(current, delay, total_global)
             ),
@@ -2279,12 +2638,14 @@ class OrchestratorApp:
             status_text = f"EJECUTANDO | Loop {current}/{max_loops}"
         self._set_status(status_text, DARK_COLORS["blue"])
 
-    def _cb_start_item(self, idx, name, reps):
+    def _cb_start_item(self, idx, name, reps, mode_label=""):
         # Track per-script timing for infinite mode countdown
         if hasattr(self, '_exec_playlist') and idx < len(self._exec_playlist):
             item = self._exec_playlist[idx]
             self._cur_item_start_time = time.time()
             self._cur_item_total_time = self._calc_item_time(item)
+        if mode_label:
+            self._set_status(f"EJECUTANDO | {name}: {mode_label}", DARK_COLORS["blue"])
 
     def _cb_repeat(self, global_rep, total_global, total_per_loop, name, current, total_item, loop, max_loops):
         # Infinite mode: track per-loop progress by rep count (bar is reset each loop)
@@ -2375,6 +2736,26 @@ class OrchestratorApp:
         """Called when fallback script fails to launch (no detiene el loop)."""
         self._set_status(
             f"⚠️ Error al lanzar recuperación {fb_name}: {error}",
+            DARK_COLORS["yellow"])
+
+    def _cb_repeat_until_check(self, idx, name, iteration, ru_max, found, condition_met):
+        """Called after each repeat-until iteration when checking the icon."""
+        status = "encontrado" if found else "no encontrado"
+        met = "✓ CONDICIÓN CUMPLIDA" if condition_met else f"buscando... ({iteration}/{ru_max})"
+        self._set_status(
+            f"🔄 {name}: icono {status} | {met}",
+            DARK_COLORS["green"] if condition_met else DARK_COLORS["blue"])
+
+    def _cb_repeat_until_done(self, idx, name, iteration):
+        """Called when the repeat-until condition is met."""
+        self._set_status(
+            f"✅ {name}: condición cumplida en {iteration} intento(s)",
+            DARK_COLORS["green"])
+
+    def _cb_repeat_until_max(self, idx, name, ru_max):
+        """Called when repeat-until reaches max iterations without condition met."""
+        self._set_status(
+            f"⚠️ {name}: máximo de {ru_max} intentos alcanzado sin cumplir condición",
             DARK_COLORS["yellow"])
 
     def _cb_error(self, msg):
