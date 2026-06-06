@@ -7,7 +7,10 @@ import threading
 import time
 import ctypes
 
-from config_manager import load_config, save_config, get_config_path, DEFAULT_SETTINGS
+from config_manager import (load_config, save_config, get_config_path,
+                            DEFAULT_SETTINGS, list_profiles,
+                            get_active_profile_name, set_active_profile_name,
+                            delete_profile, rename_profile, clone_profile)
 from executor import Executor
 from hotkey import HotkeyListener
 from mini_bar import MiniBar, format_time as mini_format_time
@@ -96,8 +99,15 @@ class OrchestratorApp:
         # Dark title bar on Windows (with retry logic)
         _apply_dark_titlebar(self.root)
 
+        # ── Perfiles ──
+        self._current_profile = get_active_profile_name()
+        self._profile_names = list_profiles()
+        if self._current_profile not in self._profile_names:
+            # Profile doesn't exist yet (first run / migration), create it
+            self._profile_names.append(self._current_profile)
+
         # Estado
-        config = load_config()
+        config = load_config(self._current_profile)
         self.playlist = config["playlist"]
         self.settings = config["settings"]
 
@@ -138,6 +148,7 @@ class OrchestratorApp:
         self._build_ui()
         self._refresh_list()
         self._update_time_labels()
+        self._update_title()
 
         # Guardar al cerrar
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -224,8 +235,206 @@ class OrchestratorApp:
     def _menu_save(self):
         """Guardar playlist actual."""
         settings = self._gather_settings()
-        save_config(self.playlist, settings)
+        save_config({"playlist": self.playlist, "settings": settings}, self._current_profile)
         self._dark_dialog("Guardado", "Playlist y configuración guardadas.", "success")
+
+    # ═══════════════════════════════════════════════════════════════
+    # PERFILES
+    # ═══════════════════════════════════════════════════════════════
+
+    def _save_and_switch(self, target_profile):
+        """Guardar perfil actual y cargar el nuevo."""
+        if self._current_profile == target_profile:
+            return
+        # Save current
+        settings = self._gather_settings()
+        save_config({"playlist": self.playlist, "settings": settings}, self._current_profile)
+        # Load target
+        config = load_config(target_profile)
+        self._current_profile = target_profile
+        self.playlist = config["playlist"]
+        self.settings = config["settings"]
+        set_active_profile_name(target_profile)
+        # Refresh UI
+        self._refresh_profile_combo()
+        self._refresh_list()
+        self._sync_loop_controls()
+        self._update_title()
+
+    def _on_profile_switch(self, event=None):
+        """Handler del Combobox de perfil."""
+        new_profile = self.profile_var.get()
+        if new_profile and new_profile != self._current_profile:
+            self._save_and_switch(new_profile)
+
+    def _refresh_profile_combo(self):
+        """Actualizar la lista y selección del combobox de perfiles."""
+        self._profile_names = list_profiles()
+        if self._current_profile not in self._profile_names:
+            self._profile_names.append(self._current_profile)
+        self.profile_combo["values"] = sorted(set(self._profile_names))
+        self.profile_var.set(self._current_profile)
+
+    def _update_title(self):
+        """Actualizar el título de la ventana con el perfil activo."""
+        self.root.title(f"TinyTask Orchestrator — [{self._current_profile}]")
+
+    def _new_profile(self):
+        """Crear un nuevo perfil vacío."""
+        # Save current first
+        settings = self._gather_settings()
+        save_config({"playlist": self.playlist, "settings": settings}, self._current_profile)
+        # Ask name
+        dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
+        _apply_dark_titlebar(dlg)
+        dlg.title("Nuevo perfil")
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        frame = ttk.Frame(dlg, padding=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text="Nombre del nuevo perfil:", style="Bold.TLabel").pack(pady=(0, 8))
+        name_var = tk.StringVar()
+        entry = ttk.Entry(frame, textvariable=name_var, width=24)
+        entry.pack(pady=(0, 10))
+        entry.focus_set()
+        def _create():
+            name = name_var.get().strip()
+            if not name:
+                return
+            if name in list_profiles():
+                self._dark_dialog("Error", f"El perfil '{name}' ya existe.", "error")
+                return
+            save_config({"playlist": [], "settings": DEFAULT_SETTINGS.copy()}, name)
+            dlg.destroy()
+            self._save_and_switch(name)
+        ttk.Button(frame, text="Crear", command=_create, style="Compact.TButton").pack()
+        entry.bind("<Return>", lambda e: _create())
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+        # Center
+        dlg.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = dlg.winfo_width(), dlg.winfo_height()
+        dlg.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        dlg.wait_window()
+
+    def _rename_profile(self):
+        """Renombrar el perfil activo."""
+        old_name = self._current_profile
+        dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
+        _apply_dark_titlebar(dlg)
+        dlg.title("Renombrar perfil")
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        frame = ttk.Frame(dlg, padding=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text=f"Renombrar '{old_name}' a:", style="Bold.TLabel").pack(pady=(0, 8))
+        name_var = tk.StringVar(value=old_name)
+        entry = ttk.Entry(frame, textvariable=name_var, width=24)
+        entry.pack(pady=(0, 10))
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+        def _rename():
+            new_name = name_var.get().strip()
+            if not new_name or new_name == old_name:
+                dlg.destroy()
+                return
+            if new_name in list_profiles():
+                self._dark_dialog("Error", f"El perfil '{new_name}' ya existe.", "error")
+                return
+            if rename_profile(old_name, new_name):
+                # Reload from the renamed file
+                config = load_config(new_name)
+                self._current_profile = new_name
+                self.playlist = config["playlist"]
+                self.settings = config["settings"]
+                self._refresh_profile_combo()
+                self._refresh_list()
+                self._sync_loop_controls()
+                self._update_title()
+            dlg.destroy()
+        ttk.Button(frame, text="Renombrar", command=_rename, style="Compact.TButton").pack()
+        entry.bind("<Return>", lambda e: _rename())
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+        dlg.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = dlg.winfo_width(), dlg.winfo_height()
+        dlg.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        dlg.wait_window()
+
+    def _delete_profile(self):
+        """Eliminar un perfil."""
+        names = list_profiles()
+        if len(names) <= 1:
+            self._dark_dialog("Error", "No se puede eliminar el único perfil.", "error")
+            return
+        # Delete current profile → switch to another
+        name_to_delete = self._current_profile
+        confirm = messagebox.askyesno(
+            "Eliminar perfil",
+            f"¿Eliminar el perfil '{name_to_delete}'?\n\n"
+            f"Esta acción no se puede deshacer.\n"
+            f"Los scripts y configuraciones se perderán.",
+            parent=self.root)
+        if not confirm:
+            return
+        delete_profile(name_to_delete)
+        # Switch to first available
+        remaining = list_profiles()
+        if not remaining:
+            remaining = ["default"]
+            save_config({"playlist": [], "settings": DEFAULT_SETTINGS.copy()}, "default")
+        self._save_and_switch(remaining[0])
+
+    def _clone_profile(self):
+        """Clonar (duplicar) el perfil activo."""
+        source = self._current_profile
+        dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
+        _apply_dark_titlebar(dlg)
+        dlg.title("Clonar perfil")
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        frame = ttk.Frame(dlg, padding=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text=f"Clonar '{source}' como:", style="Bold.TLabel").pack(pady=(0, 8))
+        name_var = tk.StringVar(value=f"{source} (copia)")
+        entry = ttk.Entry(frame, textvariable=name_var, width=24)
+        entry.pack(pady=(0, 10))
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+        def _clone():
+            new_name = name_var.get().strip()
+            if not new_name:
+                return
+            if new_name in list_profiles():
+                self._dark_dialog("Error", f"El perfil '{new_name}' ya existe.", "error")
+                return
+            # Save current first
+            settings = self._gather_settings()
+            save_config({"playlist": self.playlist, "settings": settings}, source)
+            if clone_profile(source, new_name):
+                dlg.destroy()
+                self._save_and_switch(new_name)
+        ttk.Button(frame, text="Clonar", command=_clone, style="Compact.TButton").pack()
+        entry.bind("<Return>", lambda e: _clone())
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+        dlg.update_idletasks()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        dw, dh = dlg.winfo_width(), dlg.winfo_height()
+        dlg.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        dlg.wait_window()
+
+    def _sync_loop_controls(self):
+        """Sincronizar los controles de loop con self.settings."""
+        self.loop_mode_var.set(self.settings.get("loop_mode", "once"))
+        self.loop_count_var.set(str(self.settings.get("loop_count", 1)))
+        self.loop_delay_var.set(str(self.settings.get("loop_delay", 0)))
+        self._on_loop_mode_change(None)
 
     def _menu_reset_size(self):
         """Restaurar tamaño default."""
@@ -421,6 +630,30 @@ class OrchestratorApp:
 
     def _build_ui(self):
         c = DARK_COLORS
+
+        # ===== Barra de Perfiles =====
+        profile_frame = ttk.LabelFrame(self.root, text=" Perfil ", padding=3)
+        profile_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
+
+        ttk.Label(profile_frame, text="Activo:", style="Compact.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        self.profile_var = tk.StringVar(value=self._current_profile)
+        self.profile_combo = ttk.Combobox(
+            profile_frame,
+            textvariable=self.profile_var,
+            values=self._profile_names,
+            width=16,
+            state="readonly")
+        self.profile_combo.pack(side=tk.LEFT, padx=2)
+        self.profile_combo.bind("<<ComboboxSelected>>", self._on_profile_switch)
+
+        ttk.Button(profile_frame, text="+", width=2, style="Compact.TButton",
+                   command=self._new_profile).pack(side=tk.LEFT, padx=(6, 1))
+        ttk.Button(profile_frame, text="✎", width=2, style="Compact.TButton",
+                   command=self._rename_profile).pack(side=tk.LEFT, padx=1)
+        ttk.Button(profile_frame, text="🗑", width=2, style="Compact.TButton",
+                   command=self._delete_profile).pack(side=tk.LEFT, padx=1)
+        ttk.Button(profile_frame, text="⧉", width=2, style="Compact.TButton",
+                   command=self._clone_profile).pack(side=tk.LEFT, padx=1)
 
         # ===== Frame Configuración del Loop (compacto) =====
         loop_frame = ttk.LabelFrame(self.root, text=" Loop ", padding=5)
@@ -2937,7 +3170,7 @@ class OrchestratorApp:
 
     def _on_close(self):
         settings = self._gather_settings()
-        save_config(self.playlist, settings)
+        save_config({"playlist": self.playlist, "settings": settings}, self._current_profile)
         self.hotkey.stop()
         if self.mini_bar is not None:
             self.mini_bar.close()
