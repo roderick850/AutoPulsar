@@ -149,7 +149,7 @@ class Executor(threading.Thread):
                             break
 
                         # ── Check the repeat-until condition ──
-                        found = check_icon(ru_icon, None, ru_threshold)
+                        found, _ = check_icon(ru_icon, None, ru_threshold)
                         condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
 
                         self._safe_callback("on_repeat_until_check", idx, name,
