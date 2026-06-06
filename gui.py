@@ -1617,73 +1617,106 @@ class OrchestratorApp:
                 ru_icon_label.config(text=os.path.basename(p))
 
         def _capture_ru_region():
-            """Capturar región de pantalla como icono (igual que en condiciones)."""
-            from icon_detector import HAS_MSS
+            """Capturar región de pantalla como icono — soporte multi-monitor."""
             from PIL import Image, ImageTk
             import time as _time
-            try:
-                if HAS_MSS:
-                    import mss
-                    with mss.mss() as sct:
-                        monitor = sct.monitors[1]
-                        screen = sct.grab(monitor)
+            import mss
+
+            with mss.mss() as sct:
+                monitors = list(sct.monitors)  # [0]=virtual, [1..N]=físicos
+
+            num_physical = len(monitors) - 1
+
+            def _do_capture(monitor):
+                try:
+                    with mss.mss() as sct2:
+                        screen = sct2.grab(monitor)
                         img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
-                else:
+                except Exception:
                     from PIL import ImageGrab
                     img = ImageGrab.grab(all_screens=True)
-            except Exception:
-                from PIL import ImageGrab
-                img = ImageGrab.grab(all_screens=True)
 
-            cap_win = ctk.CTkToplevel(win, fg_color="black")
-            cap_win.attributes("-fullscreen", True)
-            cap_win.attributes("-topmost", True)
-            cap_win.configure(cursor="crosshair")
+                cap_win = ctk.CTkToplevel(win.winfo_toplevel(), fg_color="black")
+                # Posicionar en el monitor destino ANTES de fullscreen
+                cap_win.geometry(f"+{monitor['left']}+{monitor['top']}")
+                cap_win.attributes("-fullscreen", True)
+                cap_win.attributes("-topmost", True)
+                cap_win.configure(cursor="crosshair")
+                cap_win.grab_set()
+                cap_win.focus_force()
 
-            photo = ImageTk.PhotoImage(img)
-            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
-            canvas.pack(fill=tk.BOTH, expand=True)
-            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-            canvas._photo_ref = photo
+                photo = ImageTk.PhotoImage(img)
+                canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+                canvas.pack(fill=tk.BOTH, expand=True)
+                canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+                canvas._photo_ref = photo
 
-            rect = None
-            start = [0, 0]
+                rect = None
+                start = [0, 0]
 
-            def on_down(e):
-                start[0], start[1] = e.x, e.y
-                nonlocal rect
-                if rect:
-                    canvas.delete(rect)
-                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
-                    outline="#7c7cf8", width=2, dash=(4, 2))
+                def on_down(e):
+                    start[0], start[1] = e.x, e.y
+                    nonlocal rect
+                    if rect:
+                        canvas.delete(rect)
+                    rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                        outline="#7c7cf8", width=2, dash=(4, 2))
 
-            def on_drag(e):
-                nonlocal rect
-                if rect:
-                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+                def on_drag(e):
+                    nonlocal rect
+                    if rect:
+                        canvas.coords(rect, start[0], start[1], e.x, e.y)
 
-            def on_up(e):
-                x1, y1 = min(start[0], e.x), min(start[1], e.y)
-                x2, y2 = max(start[0], e.x), max(start[1], e.y)
-                cap_win.destroy()
-                if x2 - x1 < 10 or y2 - y1 < 10:
-                    return
-                cropped = img.crop((x1, y1, x2, y2))
-                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
-                os.makedirs(icons_dir, exist_ok=True)
-                fname = f"ru_{int(_time.time())}.png"
-                save_path = os.path.join(icons_dir, fname)
-                cropped.save(save_path)
-                ru_icon_var.set(save_path)
-                ru_icon_label.config(text=fname)
+                def _cancel(e=None):
+                    cap_win.destroy()
 
-            canvas.bind("<ButtonPress-1>", on_down)
-            canvas.bind("<B1-Motion>", on_drag)
-            canvas.bind("<ButtonRelease-1>", on_up)
-            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
-            canvas.create_text(img.width // 2, 30,
-                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
-                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+                def on_up(e):
+                    x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                    x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                    cap_win.destroy()
+                    if x2 - x1 < 10 or y2 - y1 < 10:
+                        return
+                    cropped = img.crop((x1, y1, x2, y2))
+                    icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                    os.makedirs(icons_dir, exist_ok=True)
+                    fname = f"ru_{int(_time.time())}.png"
+                    save_path = os.path.join(icons_dir, fname)
+                    cropped.save(save_path)
+                    ru_icon_var.set(save_path)
+                    ru_icon_label.config(text=fname)
+
+                canvas.bind("<ButtonPress-1>", on_down)
+                canvas.bind("<B1-Motion>", on_drag)
+                canvas.bind("<ButtonRelease-1>", on_up)
+                # Escape en ventana Y canvas (por si el canvas tiene foco)
+                cap_win.bind("<Escape>", _cancel)
+                canvas.bind("<Escape>", _cancel)
+                canvas.focus_set()
+
+                canvas.create_text(img.width // 2, 30,
+                    text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                    fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+            if num_physical <= 1:
+                _do_capture(monitors[1])
+                return
+
+            # ── Más de un monitor: mostrar selector ──
+            sel_win = ctk.CTkToplevel(win, fg_color=DARK_COLORS["bg"])
+            sel_win.title("Seleccionar monitor")
+            sel_win.resizable(False, False)
+            sel_win.grab_set()
+
+            ttk.Label(sel_win, text="¿De qué monitor capturar?",
+                      style="Bold.TLabel").pack(pady=(15, 10), padx=30)
+
+            for i, m in enumerate(monitors[1:], start=1):
+                ttk.Button(sel_win, text=f"Monitor {i} ({m['width']}×{m['height']})",
+                           command=lambda m=m: [_do_capture(m), sel_win.destroy()],
+                           style="Compact.TButton").pack(pady=3, padx=20, fill=tk.X)
+
+            ttk.Button(sel_win, text="Cancelar", command=sel_win.destroy,
+                       style="Compact.TButton").pack(pady=(8, 15))
 
         btn_row = ttk.Frame(ru_icon_row)
         btn_row.pack(side=tk.RIGHT)
@@ -1840,73 +1873,106 @@ class OrchestratorApp:
                 ru_icon_label.config(text=os.path.basename(p))
 
         def _capture_ru_region():
-            """Capturar región de pantalla como icono."""
-            from icon_detector import HAS_MSS
+            """Capturar región de pantalla como icono — soporte multi-monitor."""
             from PIL import Image, ImageTk
             import time as _time
-            try:
-                if HAS_MSS:
-                    import mss
-                    with mss.mss() as sct:
-                        monitor = sct.monitors[1]
-                        screen = sct.grab(monitor)
+            import mss
+
+            with mss.mss() as sct:
+                monitors = list(sct.monitors)  # [0]=virtual, [1..N]=físicos
+
+            num_physical = len(monitors) - 1
+
+            def _do_capture(monitor):
+                try:
+                    with mss.mss() as sct2:
+                        screen = sct2.grab(monitor)
                         img = Image.frombytes("RGB", screen.size, screen.bgra, "raw", "BGRX")
-                else:
+                except Exception:
                     from PIL import ImageGrab
                     img = ImageGrab.grab(all_screens=True)
-            except Exception:
-                from PIL import ImageGrab
-                img = ImageGrab.grab(all_screens=True)
 
-            cap_win = ctk.CTkToplevel(win, fg_color="black")
-            cap_win.attributes("-fullscreen", True)
-            cap_win.attributes("-topmost", True)
-            cap_win.configure(cursor="crosshair")
+                cap_win = ctk.CTkToplevel(win.winfo_toplevel(), fg_color="black")
+                # Posicionar en el monitor destino ANTES de fullscreen
+                cap_win.geometry(f"+{monitor['left']}+{monitor['top']}")
+                cap_win.attributes("-fullscreen", True)
+                cap_win.attributes("-topmost", True)
+                cap_win.configure(cursor="crosshair")
+                cap_win.grab_set()
+                cap_win.focus_force()
 
-            photo = ImageTk.PhotoImage(img)
-            canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
-            canvas.pack(fill=tk.BOTH, expand=True)
-            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-            canvas._photo_ref = photo
+                photo = ImageTk.PhotoImage(img)
+                canvas = tk.Canvas(cap_win, bg="black", highlightthickness=0)
+                canvas.pack(fill=tk.BOTH, expand=True)
+                canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+                canvas._photo_ref = photo
 
-            rect = None
-            start = [0, 0]
+                rect = None
+                start = [0, 0]
 
-            def on_down(e):
-                start[0], start[1] = e.x, e.y
-                nonlocal rect
-                if rect:
-                    canvas.delete(rect)
-                rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
-                    outline="#7c7cf8", width=2, dash=(4, 2))
+                def on_down(e):
+                    start[0], start[1] = e.x, e.y
+                    nonlocal rect
+                    if rect:
+                        canvas.delete(rect)
+                    rect = canvas.create_rectangle(e.x, e.y, e.x, e.y,
+                        outline="#7c7cf8", width=2, dash=(4, 2))
 
-            def on_drag(e):
-                nonlocal rect
-                if rect:
-                    canvas.coords(rect, start[0], start[1], e.x, e.y)
+                def on_drag(e):
+                    nonlocal rect
+                    if rect:
+                        canvas.coords(rect, start[0], start[1], e.x, e.y)
 
-            def on_up(e):
-                x1, y1 = min(start[0], e.x), min(start[1], e.y)
-                x2, y2 = max(start[0], e.x), max(start[1], e.y)
-                cap_win.destroy()
-                if x2 - x1 < 10 or y2 - y1 < 10:
-                    return
-                cropped = img.crop((x1, y1, x2, y2))
-                icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
-                os.makedirs(icons_dir, exist_ok=True)
-                fname = f"ru_{int(_time.time())}.png"
-                save_path = os.path.join(icons_dir, fname)
-                cropped.save(save_path)
-                ru_icon_var.set(save_path)
-                ru_icon_label.config(text=fname)
+                def _cancel(e=None):
+                    cap_win.destroy()
 
-            canvas.bind("<ButtonPress-1>", on_down)
-            canvas.bind("<B1-Motion>", on_drag)
-            canvas.bind("<ButtonRelease-1>", on_up)
-            cap_win.bind("<Escape>", lambda e: cap_win.destroy())
-            canvas.create_text(img.width // 2, 30,
-                text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
-                fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+                def on_up(e):
+                    x1, y1 = min(start[0], e.x), min(start[1], e.y)
+                    x2, y2 = max(start[0], e.x), max(start[1], e.y)
+                    cap_win.destroy()
+                    if x2 - x1 < 10 or y2 - y1 < 10:
+                        return
+                    cropped = img.crop((x1, y1, x2, y2))
+                    icons_dir = os.path.join(os.path.dirname(get_config_path()), "icons")
+                    os.makedirs(icons_dir, exist_ok=True)
+                    fname = f"ru_{int(_time.time())}.png"
+                    save_path = os.path.join(icons_dir, fname)
+                    cropped.save(save_path)
+                    ru_icon_var.set(save_path)
+                    ru_icon_label.config(text=fname)
+
+                canvas.bind("<ButtonPress-1>", on_down)
+                canvas.bind("<B1-Motion>", on_drag)
+                canvas.bind("<ButtonRelease-1>", on_up)
+                # Escape en ventana Y canvas (por si el canvas tiene foco)
+                cap_win.bind("<Escape>", _cancel)
+                canvas.bind("<Escape>", _cancel)
+                canvas.focus_set()
+
+                canvas.create_text(img.width // 2, 30,
+                    text="Selecciona el área del icono (clic + arrastrar) | ESC para cancelar",
+                    fill="#cdd6f4", font=("Segoe UI", 11, "bold"), anchor=tk.N)
+
+            if num_physical <= 1:
+                _do_capture(monitors[1])
+                return
+
+            # ── Más de un monitor: mostrar selector ──
+            sel_win = ctk.CTkToplevel(win, fg_color=DARK_COLORS["bg"])
+            sel_win.title("Seleccionar monitor")
+            sel_win.resizable(False, False)
+            sel_win.grab_set()
+
+            ttk.Label(sel_win, text="¿De qué monitor capturar?",
+                      style="Bold.TLabel").pack(pady=(15, 10), padx=30)
+
+            for i, m in enumerate(monitors[1:], start=1):
+                ttk.Button(sel_win, text=f"Monitor {i} ({m['width']}×{m['height']})",
+                           command=lambda m=m: [_do_capture(m), sel_win.destroy()],
+                           style="Compact.TButton").pack(pady=3, padx=20, fill=tk.X)
+
+            ttk.Button(sel_win, text="Cancelar", command=sel_win.destroy,
+                       style="Compact.TButton").pack(pady=(8, 15))
 
         btn_row = ttk.Frame(ru_icon_row)
         btn_row.pack(side=tk.RIGHT)
