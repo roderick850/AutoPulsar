@@ -10,8 +10,121 @@ except ImportError:
     HAS_ICON_DETECTOR = False
 
 
+def _normalize_conditions(item):
+    """Convierte formato antiguo (repeat_until_*) a formato unificado.
+
+    Retorna (conditions_dict, is_repeat_until).
+    conditions_dict siempre tiene la forma unificada:
+    {
+        "action": "require" | "repeat_until",
+        "mode": "and" | "or",
+        "items": [...],
+        "repeat": {...},   # solo si action == "repeat_until"
+        "retry": {...},
+        "fallback": {...},
+    }
+    """
+    conditions = item.get("conditions", {}) or {}
+
+    # ── Migrar formato antiguo repeat_until_* ──
+    if item.get("repeat_until_enabled") and item.get("repeat_until_icon"):
+        icon = item["repeat_until_icon"]
+        ru_mode = item.get("repeat_until_mode", "match")
+        # Crear condición unificada (siempre "require" — stop_when
+        # maneja la diferencia entre match y no_match)
+        cond_item = {
+            "type": "require",
+            "icon_path": icon,
+            "label": os.path.basename(icon),
+            "threshold": item.get("repeat_until_threshold", 0.08),
+        }
+        conditions = {
+            "action": "repeat_until",
+            "mode": "and",
+            "items": [cond_item],
+            "repeat": {
+                "stop_when": ru_mode,
+                "max_iterations": item.get("repeat_until_max_iterations", 0),
+                "check_interval": item.get("repeat_until_check_interval", 0.5),
+            },
+            "retry": {"enabled": False, "count": 3, "delay": 5},
+            "fallback": {"enabled": False, "threshold": 3,
+                         "script": "", "delay_after": 0},
+        }
+        return conditions, True
+
+    # ── Si ya tiene el formato unificado ──
+    if conditions.get("action"):
+        return conditions, (conditions.get("action") == "repeat_until")
+
+    # ── Condiciones "legacy" sin action → asumir "require" ──
+    if conditions.get("items"):
+        conditions["action"] = "require"
+        return conditions, False
+
+    # Sin condiciones
+    return conditions, False
+
+
+def _check_icon_with_threshold(cond):
+    """Verifica un icono usando el threshold definido en la condición."""
+    threshold = cond.get("threshold", 0.08)
+    return check_icon(cond.get("icon_path", ""), None, threshold)
+
+
+def _evaluate_items(items, mode):
+    """Evalúa una lista de condiciones (require/block) con modo AND/OR.
+
+    Retorna (passed, reasons).
+    """
+    if not items:
+        return True, None
+
+    results = []
+    reasons = []
+
+    for cond in items:
+        icon_path = cond.get("icon_path", "")
+        ctype = cond.get("type", "require")
+
+        if not icon_path:
+            passed = True if ctype == "block" else False
+            results.append(passed)
+            if not passed:
+                reasons.append("Requiere icono (sin ruta)")
+            continue
+
+        found, error = _check_icon_with_threshold(cond)
+
+        if ctype == "require":
+            results.append(found)
+            if not found:
+                tag = "falta icono" if error == "missing" else "icono no visible"
+                reasons.append(
+                    f"Requerir: {tag} ({os.path.basename(icon_path)})")
+        elif ctype == "block":
+            blocked = not found
+            results.append(blocked)
+            if not blocked:
+                reasons.append(
+                    f"Bloquear: icono visible "
+                    f"({os.path.basename(icon_path)})")
+        else:
+            results.append(found)
+
+    if mode == "or":
+        passed = any(results)
+    else:
+        passed = all(results)
+
+    if passed:
+        return True, None
+    return False, "; ".join(reasons) if reasons else "condiciones no cumplidas"
+
+
 class Executor(threading.Thread):
-    def __init__(self, playlist, settings, callbacks, stop_event, launch_event):
+    def __init__(self, playlist, settings, callbacks,
+                 stop_event, launch_event):
         super().__init__(daemon=True)
         self.playlist = playlist
         self.settings = settings
@@ -35,14 +148,13 @@ class Executor(threading.Thread):
         else:
             max_loops = 1
 
-        total_reps_per_loop = sum(item["repetitions"] for item in self.playlist)
+        total_reps_per_loop = sum(
+            item["repetitions"] for item in self.playlist)
 
-        # first_loop_only items only count once overall
         once_reps = sum(item["repetitions"] for item in self.playlist
                         if item.get("first_loop_only", False))
         repeat_reps = total_reps_per_loop - once_reps
 
-        # Total global real (None si es infinito)
         if max_loops is None:
             total_global_reps = None
         else:
@@ -51,10 +163,10 @@ class Executor(threading.Thread):
         current_loop = 0
         completed_reps_total = 0
 
-        # Allow Windows to fully clean up the previous process context
         time.sleep(1)
 
-        self._safe_callback("on_start_run", total_global_reps, total_reps_per_loop, max_loops)
+        self._safe_callback("on_start_run", total_global_reps,
+                            total_reps_per_loop, max_loops)
 
         while True:
             if self.stop_event.is_set():
@@ -65,13 +177,13 @@ class Executor(threading.Thread):
 
             current_loop += 1
 
-            self._safe_callback("on_start_loop", current_loop, max_loops, total_global_reps)
+            self._safe_callback("on_start_loop", current_loop,
+                                max_loops, total_global_reps)
 
             for idx, item in enumerate(self.playlist):
                 if self.stop_event.is_set():
                     break
 
-                # Skip first_loop_only items after the first loop
                 if current_loop > 1 and item.get("first_loop_only", False):
                     continue
 
@@ -79,37 +191,56 @@ class Executor(threading.Thread):
                 reps = item["repetitions"]
                 duration = item["duration"]
                 pause = item["pause"]
-                conditions = item.get("conditions", {})
-                has_conditions = bool(conditions and conditions.get("items") and HAS_ICON_DETECTOR)
 
-                # ── Repeat-until condition mode ──
-                repeat_until = item.get("repeat_until_enabled", False)
-                ru_icon = item.get("repeat_until_icon", "")
-                ru_mode = item.get("repeat_until_mode", "match")
-                ru_threshold = item.get("repeat_until_threshold", 0.05)
-                ru_max = item.get("repeat_until_max_iterations", 99999)
-                ru_interval = item.get("repeat_until_check_interval", 0.5)
-                # 0 = unlimited (no max)
-                ru_unlimited = (ru_max == 0)
+                # ── Normalizar condiciones (formato unificado) ──
+                conditions, is_repeat_until = _normalize_conditions(item)
+                has_conditions = bool(
+                    conditions.get("items") and HAS_ICON_DETECTOR)
 
-                if repeat_until and HAS_ICON_DETECTOR and ru_icon:
-                    mode_label = f"(hasta {'encontrar' if ru_mode == 'match' else 'desaparecer'} icono)"
+                if is_repeat_until:
+                    mode_label = "(hasta condición)"
                 else:
                     mode_label = ""
 
                 self._safe_callback("on_start_item", idx, name,
-                    None if repeat_until else reps,
+                    None if is_repeat_until else reps,
                     mode_label)
 
-                if repeat_until and HAS_ICON_DETECTOR and ru_icon:
-                    # ── LOOP UNTIL CONDITION ──
+                if is_repeat_until and HAS_ICON_DETECTOR:
+                    # ── REPEAT UNTIL (unificado) ──
+                    repeat_cfg = conditions.get("repeat", {})
+                    stop_when = repeat_cfg.get("stop_when", "match")
+                    ru_max = repeat_cfg.get("max_iterations", 0)
+                    ru_interval = repeat_cfg.get("check_interval", 0.5)
+                    ru_unlimited = (ru_max == 0)
+
+                    # ── Verificar ANTES de la primera ejecución ──
+                    ok, reason = _evaluate_items(
+                        conditions.get("items", []),
+                        conditions.get("mode", "and"))
+                    if stop_when == "match":
+                        condition_already_met = ok
+                    else:  # no_match
+                        condition_already_met = not ok
+
+                    if condition_already_met:
+                        # La condición ya se cumple → detener todo
+                        self._safe_callback(
+                            "on_repeat_until_done",
+                            idx, name, 0)
+                        self.stop_event.set()
+                        break
+
                     iteration = 0
-                    while (ru_unlimited or iteration < ru_max) and not self.stop_event.is_set():
+                    while ((ru_unlimited or iteration < ru_max)
+                           and not self.stop_event.is_set()):
                         iteration += 1
 
+                        # ── Intervalo entre iteraciones ──
                         if ru_interval > 0 and iteration > 1:
                             slept = 0.0
-                            while slept < ru_interval and not self.stop_event.is_set():
+                            while (slept < ru_interval
+                                   and not self.stop_event.is_set()):
                                 time.sleep(0.1)
                                 slept += 0.1
 
@@ -128,11 +259,15 @@ class Executor(threading.Thread):
                             max_loops,
                         )
 
+                        # ── Lanzar script ──
                         try:
                             self.launch_event.clear()
-                            self._safe_callback("on_launch", item["path"])
+                            self._safe_callback(
+                                "on_launch", item["path"])
                             if not self.launch_event.wait(timeout=10):
-                                raise TimeoutError("El hilo principal no pudo lanzar el .exe")
+                                raise TimeoutError(
+                                    "El hilo principal no pudo "
+                                    "lanzar el .exe")
                             time.sleep(2.0)
                         except Exception as e:
                             self._safe_callback("on_error", str(e))
@@ -140,38 +275,42 @@ class Executor(threading.Thread):
 
                         completed_reps_total += 1
 
-                        # ── Poll condition during duration ──
-                        poll_interval = 1.0  # check every 1s
-                        condition_met = False
+                        # ── Esperar duración completa ──
                         slept = 0.0
-                        while slept < duration and not self.stop_event.is_set():
-                            time.sleep(min(poll_interval, duration - slept))
-                            slept += poll_interval
-                            if self.stop_event.is_set():
-                                break
-                            found, _ = check_icon(ru_icon, None, ru_threshold)
-                            condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
-                            if condition_met:
-                                break
+                        while (slept < duration
+                               and not self.stop_event.is_set()):
+                            time.sleep(0.1)
+                            slept += 0.1
 
-                        # ── Final check with retries (handles timing edge cases) ──
-                        if not condition_met and not self.stop_event.is_set():
-                            for _ in range(3):
-                                found, _ = check_icon(ru_icon, None, ru_threshold)
-                                condition_met = (ru_mode == "match" and found) or (ru_mode == "no_match" and not found)
-                                if condition_met:
-                                    break
-                                time.sleep(0.3)
-
-                        self._safe_callback("on_repeat_until_check", idx, name,
-                            iteration, ru_max, found, condition_met)
-
-                        if condition_met:
-                            self._safe_callback("on_repeat_until_done", idx, name, iteration)
+                        if self.stop_event.is_set():
                             break
 
-                    if not ru_unlimited and iteration >= ru_max and not self.stop_event.is_set():
-                        self._safe_callback("on_repeat_until_max", idx, name, ru_max)
+                        # ── Verificar condición al final ──
+                        ok2, _ = _evaluate_items(
+                            conditions.get("items", []),
+                            conditions.get("mode", "and"))
+                        if stop_when == "match":
+                            condition_met = ok2
+                        else:
+                            condition_met = not ok2
+
+                        self._safe_callback(
+                            "on_repeat_until_check", idx, name,
+                            iteration, ru_max,
+                            ok2, condition_met)
+
+                        if condition_met:
+                            self._safe_callback(
+                                "on_repeat_until_done",
+                                idx, name, iteration)
+                            self.stop_event.set()
+                            break
+
+                    if (not ru_unlimited and iteration >= ru_max
+                            and not self.stop_event.is_set()):
+                        self._safe_callback(
+                            "on_repeat_until_max",
+                            idx, name, ru_max)
 
                 else:
                     # ── FIXED REPETITIONS ──
@@ -179,12 +318,12 @@ class Executor(threading.Thread):
                         if self.stop_event.is_set():
                             break
 
-                        # ── Verificar condiciones ANTES de cada repetición ──
+                        # ── Verificar condiciones ANTES ──
                         if has_conditions:
                             ok = self._check_conditions_with_retry(
                                 conditions, idx, item)
                             if not ok:
-                                break
+                                break  # saltar reps restantes
 
                         self._safe_callback(
                             "on_repeat",
@@ -200,9 +339,12 @@ class Executor(threading.Thread):
 
                         try:
                             self.launch_event.clear()
-                            self._safe_callback("on_launch", item["path"])
+                            self._safe_callback(
+                                "on_launch", item["path"])
                             if not self.launch_event.wait(timeout=10):
-                                raise TimeoutError("El hilo principal no pudo lanzar el .exe")
+                                raise TimeoutError(
+                                    "El hilo principal no pudo "
+                                    "lanzar el .exe")
                             time.sleep(2.0)
                         except Exception as e:
                             self._safe_callback("on_error", str(e))
@@ -211,7 +353,8 @@ class Executor(threading.Thread):
                         completed_reps_total += 1
 
                         slept = 0.0
-                        while slept < duration and not self.stop_event.is_set():
+                        while (slept < duration
+                               and not self.stop_event.is_set()):
                             time.sleep(0.1)
                             slept += 0.1
 
@@ -220,18 +363,23 @@ class Executor(threading.Thread):
 
                         if r < reps - 1 and pause > 0:
                             slept = 0.0
-                            while slept < pause and not self.stop_event.is_set():
+                            while (slept < pause
+                                   and not self.stop_event.is_set()):
                                 time.sleep(0.1)
                                 slept += 0.1
 
                         if self.stop_event.is_set():
                             break
 
-            # Delay between full loops (except after the last loop)
-            if (max_loops is None or current_loop < max_loops) and loop_delay > 0:
-                self._safe_callback("on_loop_delay", current_loop, loop_delay, total_global_reps)
+            # Delay entre loops
+            if ((max_loops is None or current_loop < max_loops)
+                    and loop_delay > 0):
+                self._safe_callback(
+                    "on_loop_delay", current_loop,
+                    loop_delay, total_global_reps)
                 slept = 0.0
-                while slept < loop_delay and not self.stop_event.is_set():
+                while (slept < loop_delay
+                       and not self.stop_event.is_set()):
                     time.sleep(0.1)
                     slept += 0.1
 
@@ -240,7 +388,8 @@ class Executor(threading.Thread):
 
         self._safe_callback(
             "on_finish",
-            "Detenido" if self.stop_event.is_set() else "Completado",
+            "Detenido" if self.stop_event.is_set()
+            else "Completado",
             completed_reps_total,
             total_global_reps,
             total_reps_per_loop,
@@ -250,9 +399,10 @@ class Executor(threading.Thread):
 
     def _check_conditions_with_retry(self, conditions, idx, item):
         """Verifica condiciones con reintentos + fallback.
-        
+
         Retorna True si las condiciones se cumplen (script debe ejecutarse).
         Retorna False si fallan (saltar esta repetición/script).
+        Usa check_conditions() original de icon_detector (probado en batalla).
         """
         retry_cfg = conditions.get("retry", {})
         retry_enabled = retry_cfg.get("enabled", False)
@@ -268,44 +418,53 @@ class Executor(threading.Thread):
                 cond_met = True
                 break
             if attempt < retry_count - 1 and retry_delay > 0:
-                self._safe_callback("on_retry_wait", idx,
-                    os.path.basename(item["path"]), attempt + 1, retry_count)
+                self._safe_callback(
+                    "on_retry_wait", idx,
+                    os.path.basename(item["path"]),
+                    attempt + 1, retry_count)
                 slept = 0.0
-                while slept < retry_delay and not self.stop_event.is_set():
+                while (slept < retry_delay
+                       and not self.stop_event.is_set()):
                     time.sleep(0.1)
                     slept += 0.1
 
         if not cond_met:
-            # Track consecutive failures for fallback
-            item["_consecutive_failures"] = item.get("_consecutive_failures", 0) + 1
+            item["_consecutive_failures"] = \
+                item.get("_consecutive_failures", 0) + 1
 
             fallback_cfg = conditions.get("fallback", {})
             if fallback_cfg.get("enabled", False):
                 threshold = fallback_cfg.get("threshold", 3)
                 fallback_script = fallback_cfg.get("script", "")
-                if item["_consecutive_failures"] >= threshold and fallback_script:
-                    self._safe_callback("on_fallback_trigger", idx,
+                if (item["_consecutive_failures"] >= threshold
+                        and fallback_script):
+                    self._safe_callback(
+                        "on_fallback_trigger", idx,
                         os.path.basename(item["path"]),
                         os.path.basename(fallback_script))
                     try:
-                        # Lanzar en background — no esperar a que termine
                         subprocess.Popen(fallback_script, shell=True)
                     except Exception as e:
-                        self._safe_callback("on_fallback_error",
-                            os.path.basename(fallback_script), str(e))
-                    item["_consecutive_failures"] = 0  # reset after fallback
+                        self._safe_callback(
+                            "on_fallback_error",
+                            os.path.basename(fallback_script),
+                            str(e))
+                    item["_consecutive_failures"] = 0
 
-                    # Delay post-fallback antes de continuar
                     fb_delay = fallback_cfg.get("delay_after", 0)
                     if fb_delay > 0:
-                        self._safe_callback("on_fallback_wait", idx,
-                            os.path.basename(item["path"]), fb_delay)
+                        self._safe_callback(
+                            "on_fallback_wait", idx,
+                            os.path.basename(item["path"]),
+                            fb_delay)
                         slept = 0.0
-                        while slept < fb_delay and not self.stop_event.is_set():
+                        while (slept < fb_delay
+                               and not self.stop_event.is_set()):
                             time.sleep(0.1)
                             slept += 0.1
 
-            self._safe_callback("on_skip_icon", idx,
+            self._safe_callback(
+                "on_skip_icon", idx,
                 os.path.basename(item["path"]))
             return False
 

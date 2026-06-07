@@ -43,6 +43,11 @@ def _find_subimage(screenshot, icon, threshold=0.08):
     screen_pixels = screen_rgb.load()
     icon_pixels = icon_rgb.load()
 
+    # ── Nota: el threshold se usa tal cual ──
+    # Para imágenes con fondo uniforme que producen falsos positivos,
+    # bajá la tolerancia manualmente desde ⚙️ Condiciones → 🎯 Tolerancia.
+    adjusted_threshold = threshold
+
     # Paso adaptativo: más fino para iconos pequeños
     step = max(1, min(iw, ih) // 6)
 
@@ -107,7 +112,7 @@ def _find_subimage(screenshot, icon, threshold=0.08):
                 min_diff = avg_diff
                 best_pos = (x, y)
 
-    if min_diff < threshold:
+    if min_diff < adjusted_threshold:
         return best_pos
     return None
 
