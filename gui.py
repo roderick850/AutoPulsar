@@ -1495,7 +1495,7 @@ class OrchestratorApp:
 
         dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
-        dlg.geometry("620x620")
+        dlg.geometry("700x620")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
@@ -1507,7 +1507,7 @@ class OrchestratorApp:
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = dlg.winfo_width(), dlg.winfo_height()
-        dlg.geometry(f"620x620+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        dlg.geometry(f"700x620+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         pad = {"padx": 8, "pady": 4}
         c = DARK_COLORS
