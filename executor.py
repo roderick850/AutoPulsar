@@ -67,9 +67,10 @@ def _normalize_conditions(item):
 
 
 def _check_icon_with_threshold(cond):
-    """Verifica un icono usando el threshold definido en la condición."""
+    """Verifica un icono usando el threshold y región definidos en la condición."""
     threshold = cond.get("threshold", 0.08)
-    return check_icon(cond.get("icon_path", ""), None, threshold)
+    region = cond.get("region")  # [x, y, w, h] o None
+    return check_icon(cond.get("icon_path", ""), region, threshold)
 
 
 def _evaluate_items(items, mode):

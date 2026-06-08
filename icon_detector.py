@@ -54,7 +54,12 @@ def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False):
     adjusted_threshold = threshold
 
     # Paso adaptativo: mas fino para iconos pequeños
-    step = max(1, min(iw, ih) // 6)
+    # Si la captura es de una region chica (search area), usar paso mas fino
+    total_area = sw * sh
+    if total_area < 600000:  # ~800x700, tipico de una region con padding
+        step = max(1, min(iw, ih) // 10)
+    else:
+        step = max(1, min(iw, ih) // 6)
 
     # ── Fase 1: búsqueda gruesa ──
     min_diff = float("inf")
@@ -220,7 +225,7 @@ def check_conditions(conditions):
                 reasons.append(f"Requiere icono (sin ruta)")
             continue
 
-        found, error = check_icon(icon_path)
+        found, error = check_icon(icon_path, cond.get("region"))
 
         if ctype == "require":
             results.append(found)       # debe estar → True si visible

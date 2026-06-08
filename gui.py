@@ -1703,11 +1703,22 @@ class OrchestratorApp:
                     fname = f"cond_{idx}_{len(cond_copy['items'])}_{int(time.time())}.png"
                     save_path = os.path.join(icons_dir, fname)
                     cropped.save(save_path)
+
+                    # ── Guardar región de búsqueda (coord absolutas + padding) ──
+                    m_left = monitor.get("left", monitor.get("x", 0))
+                    m_top = monitor.get("top", monitor.get("y", 0))
+                    padding = 80  # margen extra por si el icono se mueve
+                    search_x = max(0, x1 + m_left - padding)
+                    search_y = max(0, y1 + m_top - padding)
+                    search_w = (x2 - x1) + padding * 2
+                    search_h = (y2 - y1) + padding * 2
+
                     cond_copy["items"].append({
                         "type": "require",
                         "icon_path": save_path,
                         "label": "",
                         "threshold": 0.08,
+                        "region": [search_x, search_y, search_w, search_h],
                     })
                     _refresh_cond_list()
 
@@ -1889,6 +1900,7 @@ class OrchestratorApp:
                 return
 
             current_threshold = cond.get("threshold", 0.08)
+            search_region = cond.get("region")  # [x, y, w, h] o None
 
             # Mostrar "probando..."
             self._set_status("🔍 Probando icono...", DARK_COLORS["purple"])
@@ -1896,7 +1908,7 @@ class OrchestratorApp:
 
             try:
                 from icon_detector import diagnose_icon
-                result = diagnose_icon(ipath, threshold=current_threshold)
+                result = diagnose_icon(ipath, region=search_region, threshold=current_threshold)
             except Exception as e:
                 self._dark_dialog("Error", f"No se pudo probar el icono:\n{e}", "error")
                 return
