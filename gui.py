@@ -1495,7 +1495,7 @@ class OrchestratorApp:
 
         dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
-        dlg.geometry("700x620")
+        dlg.geometry("750x620")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
@@ -1507,7 +1507,7 @@ class OrchestratorApp:
         pw, ph = self.root.winfo_width(), self.root.winfo_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         dw, dh = dlg.winfo_width(), dlg.winfo_height()
-        dlg.geometry(f"700x620+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        dlg.geometry(f"750x620+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
         pad = {"padx": 8, "pady": 4}
         c = DARK_COLORS
@@ -2038,6 +2038,87 @@ class OrchestratorApp:
             )
 
         ttk.Button(btn_frame, text="🔍 Probar", command=_test_icon,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+
+        # ── Botón Probar TODAS las condiciones ──
+        def _test_all():
+            """Evalúa todas las condiciones juntas (AND/OR, require/block)
+            y muestra cuáles pasan, cuáles fallan, y el resultado final."""
+            items = cond_copy["items"]
+            if not items:
+                self._dark_dialog("Sin condiciones",
+                    "No hay condiciones para evaluar.", "info")
+                return
+
+            mode = cond_copy.get("mode", "and")
+            action = cond_copy.get("action", "require")
+
+            from icon_detector import diagnose_icon
+
+            self._set_status("🔍 Evaluando todas...", DARK_COLORS["purple"])
+            dlg.update()
+
+            results = []
+            for ci, cond in enumerate(items):
+                ipath = cond.get("icon_path", "")
+                ctype = cond.get("type", "require")
+                threshold = cond.get("threshold", 0.08)
+                region = cond.get("region")
+                label = cond.get("label", "") or os.path.basename(ipath)
+
+                if not ipath or not os.path.exists(ipath):
+                    results.append((label, ctype, None, "sin icono"))
+                    continue
+
+                r = diagnose_icon(ipath, region=region, threshold=threshold)
+                results.append((label, ctype, r["found"], r["min_diff"]))
+
+            # Evaluar lógica
+            passed_list = []
+            for label, ctype, found, diff in results:
+                if ctype == "require":
+                    p = found if found is not None else False
+                else:  # block
+                    p = not found if found is not None else True
+                passed_list.append(p)
+
+            if mode == "or":
+                overall = any(passed_list)
+            else:
+                overall = all(passed_list)
+
+            # ── Construir mensaje ──
+            lines = []
+            if action == "repeat_until":
+                lines.append("🔄 Modo: REPETIR HASTA")
+            else:
+                lines.append("✅ Modo: REQUERIR (solo ejecutar si cumple)")
+            lines.append(f"🧩 Combinación: {mode.upper()}")
+            lines.append("")
+
+            for i, ((label, ctype, found, diff), p) in enumerate(zip(results, passed_list)):
+                emoji = "✅" if p else "❌"
+                if found is None:
+                    status = "⚠️ sin icono"
+                elif ctype == "require":
+                    status = "visible" if found else f"NO visible (diff={diff:.3f})"
+                elif ctype == "block":
+                    status = "bloquea (visible)" if found else f"permite (NO visible, diff={diff:.3f})"
+                lines.append(f"{emoji} [{ctype}] {label}: {status}")
+
+            lines.append("")
+            if overall:
+                lines.append(f"✅ RESULTADO: condiciones CUMPLIDAS → script se ejecuta")
+            else:
+                lines.append(f"❌ RESULTADO: condiciones NO cumplidas → script NO se ejecuta")
+
+            self._dark_dialog(
+                "Evaluación de condiciones",
+                "\n".join(lines),
+                "success" if overall else "info"
+            )
+
+        ttk.Button(btn_frame, text="🧪 Todas", command=_test_all,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
         # ── Reintentos ──
