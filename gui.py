@@ -226,6 +226,8 @@ class OrchestratorApp:
             bg=c["menu_bg"], fg=c["menu_fg"],
             activebackground=c["menu_active"], activeforeground="#ffffff",
             font=("Segoe UI", 9), borderwidth=1, relief="solid")
+        help_menu.add_command(label="📖 Manual de Usuario",
+                              command=self._open_manual)
         help_menu.add_command(label="ℹ️ Acerca de TinyTask Orchestrator",
                               command=self._menu_about)
         help_mb.config(menu=help_menu)
@@ -448,6 +450,43 @@ class OrchestratorApp:
         """Restaurar tamaño default."""
         self.root.geometry("750x500")
         self._dark_dialog("Tamaño", "Ventana restaurada a 750×500.", "info")
+
+    def _open_manual(self):
+        """Abrir el manual de usuario en el navegador."""
+        import sys
+        import os
+        import tempfile
+        import shutil
+
+        # Buscar manual.html — en bundle o en desarrollo
+        manual_path = None
+        img_dir = None
+
+        if getattr(sys, 'frozen', False):
+            # PyInstaller bundle
+            base = sys._MEIPASS
+            manual_path = os.path.join(base, "manual.html")
+            img_dir = os.path.join(base, "manual_images")
+        else:
+            # Desarrollo
+            base = os.path.dirname(os.path.abspath(__file__))
+            manual_path = os.path.join(base, "manual.html")
+            img_dir = os.path.join(base, "manual_images")
+
+        if not os.path.exists(manual_path):
+            self._dark_dialog("Manual no encontrado",
+                "El archivo manual.html no se encontró.", "warning")
+            return
+
+        # Copiar a temp para que el navegador pueda abrirlo con imágenes
+        tmpdir = tempfile.mkdtemp(prefix="tto_manual_")
+        shutil.copy(manual_path, os.path.join(tmpdir, "manual.html"))
+        if img_dir and os.path.isdir(img_dir):
+            tmp_img = os.path.join(tmpdir, "manual_images")
+            shutil.copytree(img_dir, tmp_img)
+
+        html_path = os.path.join(tmpdir, "manual.html")
+        os.startfile(html_path)
 
     def _menu_about(self):
         """Mostrar diálogo Acerca de."""

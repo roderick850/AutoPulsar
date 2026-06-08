@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TinyTask Orchestrator — Manual de Usuario</title>
+<style>
+  :root {
+    --bg: #0d0d12;
+    --surface: #16161e;
+    --surface2: #1e1e2a;
+    --border: #2a2a3a;
+    --text: #cdd6f4;
+    --text2: #a6adc8;
+    --accent: #7c7cf8;
+    --green: #4caf50;
+    --yellow: #f0c040;
+    --red: #e06c75;
+    --purple: #b4a0e5;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* ── Header ── */
+  .hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 60px 20px 50px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 {
+    font-size: 2.4em;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero .subtitle {
+    color: var(--text2);
+    font-size: 1.15em;
+    margin-top: 8px;
+  }
+  .hero .version {
+    display: inline-block;
+    background: var(--surface2);
+    color: var(--accent);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    margin-top: 14px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+  nav a {
+    color: var(--text2);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    transition: all 0.2s;
+  }
+  nav a:hover { background: var(--surface2); color: var(--text); }
+
+  /* ── Main ── */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 30px 20px 60px;
+  }
+
+  /* ── Sections ── */
+  section {
+    margin-bottom: 50px;
+  }
+  h2 {
+    font-size: 1.6em;
+    margin-bottom: 8px;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+  }
+  h3 {
+    font-size: 1.15em;
+    margin: 20px 0 8px;
+    color: var(--accent);
+  }
+  p, li { color: var(--text2); margin-bottom: 8px; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .card h4 {
+    color: var(--text);
+    margin-bottom: 8px;
+    font-size: 1.05em;
+  }
+
+  /* ── Feature grid ── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .feature .icon { font-size: 1.6em; margin-bottom: 6px; }
+  .feature h4 { color: var(--text); margin-bottom: 4px; }
+  .feature p { font-size: 0.9em; }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.92em;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--text);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  tr:hover td { background: rgba(124,124,248,0.05); }
+
+  /* ── Code / Keys ── */
+  code {
+    background: var(--surface2);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+  }
+  .key {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: var(--text);
+  }
+
+  /* ── Tips ── */
+  .tip {
+    background: rgba(124,124,248,0.08);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 12px 0;
+  }
+  .tip strong { color: var(--accent); }
+  .warn {
+    background: rgba(240,192,64,0.08);
+    border-left: 3px solid var(--yellow);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 12px 0;
+  }
+
+  /* ── Images ── */
+  img.screenshot {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin: 12px 0;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    color: var(--text2);
+    font-size: 0.85em;
+    padding: 30px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HERO ═══════════ -->
+<div class="hero">
+  <h1>🛠️ TinyTask Orchestrator</h1>
+  <p class="subtitle">Automatización inteligente de scripts con condiciones visuales</p>
+  <span class="version">v1.2.0</span>
+</div>
+
+<!-- ═══════════ NAV ═══════════ -->
+<nav>
+  <a href="#inicio">Inicio rápido</a>
+  <a href="#interfaz">Interfaz principal</a>
+  <a href="#perfiles">Perfiles</a>
+  <a href="#scripts">Scripts y grupos</a>
+  <a href="#loop">Modos de loop</a>
+  <a href="#condiciones">Condiciones</a>
+  <a href="#diagnostico">Diagnóstico</a>
+  <a href="#ejecucion">Ejecución</a>
+  <a href="#atajos">Atajos</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ 1. INICIO RÁPIDO ═══════════ -->
+<section id="inicio">
+  <h2>🚀 Inicio rápido</h2>
+  <div class="card">
+    <h4>En 3 pasos</h4>
+    <ol>
+      <li><strong>Agregá tus scripts</strong> — clic en <code>+ Agregar</code> y seleccioná los <code>.exe</code> de TinyTask.</li>
+      <li><strong>Configurá repeticiones y pausas</strong> — doble clic en cada columna para editar.</li>
+      <li><strong>Ejecutá</strong> — clic en <code>▶ Iniciar</code> o presioná <span class="key">F10</span>.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═══════════ 2. INTERFAZ ═══════════ -->
+<section id="interfaz">
+  <h2>🖥️ Interfaz principal</h2>
+  <img class="screenshot" src="manual_images/ventana_principal.png" alt="Ventana principal de TinyTask Orchestrator">
+
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="icon">📋</div>
+      <h4>Barra de menú</h4>
+      <p>Archivo, Ver, Ayuda — acceso a funciones globales.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">👤</div>
+      <h4>Selector de perfil</h4>
+      <p>Cambiá entre playlists independientes con un clic.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">🔄</div>
+      <h4>Configuración de loop</h4>
+      <p>Modo (once/fixed/infinite), repeticiones y pausa entre loops.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">📊</div>
+      <h4>Lista de scripts</h4>
+      <p>Tabla con orden, repeticiones, duración, pausa y tiempo total.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">▶️</div>
+      <h4>Panel de ejecución</h4>
+      <p>Iniciar, detener, hotkey y barra de progreso.</p>
+    </div>
+    <div class="feature">
+      <div class="icon">📌</div>
+      <h4>Mini Bar</h4>
+      <p>Barra flotante compacta para gaming en un solo monitor.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 3. PERFILES ═══════════ -->
+<section id="perfiles">
+  <h2>👤 Perfiles</h2>
+  <p>Los perfiles te permiten tener <strong>múltiples playlists independientes</strong>. Cada perfil guarda sus propios scripts, configuraciones de loop y condiciones.</p>
+
+  <table>
+    <tr><th>Botón</th><th>Acción</th></tr>
+    <tr><td><code>+</code></td><td>Crear un nuevo perfil</td></tr>
+    <tr><td><code>✏️</code></td><td>Renombrar el perfil activo</td></tr>
+    <tr><td><code>📋</code></td><td>Clonar el perfil actual</td></tr>
+    <tr><td><code>🗑️</code></td><td>Eliminar el perfil activo</td></tr>
+    <tr><td><code>💾</code></td><td>Guardar cambios del perfil</td></tr>
+  </table>
+
+  <div class="tip">
+    <strong>💡 Tip:</strong> Usá perfiles para separar automatizaciones de juegos distintos sin mezclar configuraciones.
+  </div>
+</section>
+
+<!-- ═══════════ 4. SCRIPTS ═══════════ -->
+<section id="scripts">
+  <h2>📜 Scripts y grupos</h2>
+
+  <h3>Agregar scripts</h3>
+  <p>Clic en <code>+ Agregar</code> y seleccioná un archivo <code>.exe</code>. El script se añade al final de la lista.</p>
+
+  <h3>Columnas editables</h3>
+  <table>
+    <tr><th>Columna</th><th>Descripción</th><th>Editar con</th></tr>
+    <tr><td>Reps</td><td>Veces que se repite el script</td><td>Doble clic</td></tr>
+    <tr><td>Dur (s)</td><td>Duración estimada en segundos</td><td>Doble clic</td></tr>
+    <tr><td>Pausa (s)</td><td>Espera después de cada repetición</td><td>Doble clic</td></tr>
+    <tr><td>☑️ 1°</td><td>Solo ejecutar en el primer loop</td><td>Clic derecho → Primero solo</td></tr>
+    <tr><td>⚙️</td><td>Condiciones del script</td><td>Clic derecho → Condiciones</td></tr>
+  </table>
+
+  <h3>Grupos</h3>
+  <p>Seleccioná varios scripts y usá <code>Agrupar</code> para organizarlos. Los grupos se pueden colapsar, renombrar y mover juntos.</p>
+
+  <table>
+    <tr><th>Botón</th><th>Acción</th></tr>
+    <tr><td><code>Agrupar</code></td><td>Crear grupo con scripts seleccionados</td></tr>
+    <tr><td><code>Desagrupar</code></td><td>Sacar scripts del grupo</td></tr>
+    <tr><td><code>↑ ↓</code></td><td>Mover scripts hacia arriba/abajo</td></tr>
+    <tr><td><code>Clonar</code></td><td>Duplicar el script seleccionado</td></tr>
+    <tr><td><code>Quitar</code></td><td>Eliminar scripts seleccionados</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════ 5. MODOS DE LOOP ═══════════ -->
+<section id="loop">
+  <h2>🔄 Modos de loop</h2>
+
+  <table>
+    <tr><th>Modo</th><th>Comportamiento</th><th>Ejemplo</th></tr>
+    <tr><td><code>once</code></td><td>Ejecuta la lista 1 sola vez</td><td>Automatización puntual</td></tr>
+    <tr><td><code>fixed</code></td><td>Repite N veces con pausa entre loops</td><td>Farmear 10 veces con pausa de 5s</td></tr>
+    <tr><td><code>infinite</code></td><td>Repite sin fin hasta que lo detengas</td><td>AFK farming continuo</td></tr>
+  </table>
+
+  <div class="card">
+    <h4>⚙️ Configuración</h4>
+    <p><strong>Modo:</strong> <code>once</code> | <code>fixed</code> | <code>infinite</code></p>
+    <p><strong>× repeticiones:</strong> Solo aplica en modo <code>fixed</code></p>
+    <p><strong>Pausa (s):</strong> Tiempo de espera entre cada loop completo</p>
+    <p><strong>Total:</strong> Tiempo estimado total de ejecución</p>
+  </div>
+
+  <div class="tip">
+    <strong>💡 Tip:</strong> Con <code>infinite</code>, el script con ☑️ 1° solo se ejecuta en la primera vuelta. Ideal para scripts de preparación.
+  </div>
+</section>
+
+<!-- ═══════════ 6. CONDICIONES ═══════════ -->
+<section id="condiciones">
+  <h2>🎯 Condiciones visuales</h2>
+  <p>Las condiciones permiten que un script <strong>solo se ejecute si ciertos iconos están (o no están) visibles en pantalla</strong>. Esto evita que el automatismo falle cuando el juego cambia de pantalla inesperadamente.</p>
+
+  <img class="screenshot" src="manual_images/condiciones.png" alt="Diálogo de condiciones">
+
+  <h3>Tipos de condición</h3>
+  <table>
+    <tr><th>Tipo</th><th>Icono</th><th>Significado</th></tr>
+    <tr><td>Requerir</td><td>✅</td><td>El icono DEBE estar visible para ejecutar</td></tr>
+    <tr><td>Bloquear</td><td>❌</td><td>El icono NO debe estar visible para ejecutar</td></tr>
+  </table>
+
+  <h3>Modos de combinación</h3>
+  <table>
+    <tr><th>Modo</th><th>Lógica</th><th>Cuándo usarlo</th></tr>
+    <tr><td><code>AND</code></td><td>TODAS las condiciones deben cumplirse</td><td>Varias verificaciones necesarias a la vez</td></tr>
+    <tr><td><code>OR</code></td><td>AL MENOS UNA debe cumplirse</td><td>Varias pantallas válidas alternativas</td></tr>
+  </table>
+
+  <h3>Acciones</h3>
+  <table>
+    <tr><th>Acción</th><th>Comportamiento</th></tr>
+    <tr><td><code>require</code></td><td>Solo ejecuta si las condiciones se cumplen. Si no, salta el script.</td></tr>
+    <tr><td><code>repeat_until</code></td><td>Ejecuta el script repetidamente hasta que las condiciones se cumplan (o se alcance el máximo de intentos).</td></tr>
+  </table>
+
+  <h3>🔄 Repeat Until</h3>
+  <p>Ideal para acciones tipo "clickear hasta que aparezca X":</p>
+  <ul>
+    <li><strong>Detener al:</strong> Encontrar el icono (<code>match</code>) o cuando desaparezca (<code>no_match</code>)</li>
+    <li><strong>Máx. intentos:</strong> Límite de repeticiones (0 = sin límite)</li>
+    <li><strong>Intervalo:</strong> Segundos entre cada verificación</li>
+  </ul>
+
+  <h3>📊 Multi-muestreo</h3>
+  <p>Para imágenes difíciles (juegos con renderizado variable), configurá <strong>Muestreo</strong>:</p>
+  <ul>
+    <li><strong>Verificar N veces:</strong> Toma múltiples capturas rápidas (ej: 5)</li>
+    <li><strong>Aceptar si ≥ X%:</strong> Porcentaje mínimo de aciertos (ej: 60% = 3 de 5)</li>
+  </ul>
+
+  <div class="tip">
+    <strong>💡 Tip bloqueo inverso:</strong> Usá 4+ condiciones tipo <code>❌ Bloquear</code> con modo <code>AND</code> para ejecutar un script solo cuando <strong>ninguna</strong> de esas pantallas está visible — ideal para pantallas de "else" o fallback.
+  </div>
+
+  <h3>⏳ Reintentos</h3>
+  <p>Si las condiciones no se cumplen, podés configurar reintentos automáticos cada N segundos.</p>
+
+  <h3>🆘 Script de recuperación</h3>
+  <p>Si un script falla X veces seguidas, ejecutá un script alternativo (ej: reiniciar el juego, volver al menú).</p>
+</section>
+
+<!-- ═══════════ 7. DIAGNÓSTICO ═══════════ -->
+<section id="diagnostico">
+  <h2>🔍 Diagnóstico de matching</h2>
+  <p>El botón <code>🔍 Probar</code> ejecuta <strong>5 capturas rápidas</strong> y te muestra:</p>
+
+  <div class="card">
+    <h4>Resultado del diagnóstico</h4>
+    <ul>
+      <li><strong>Tasa de acierto:</strong> X/5 pruebas exitosas</li>
+      <li><strong>Min / Max / Avg diff:</strong> Rango de diferencia real</li>
+      <li><strong>Variación:</strong> Qué tanto cambia entre frames</li>
+      <li><strong>Tolerancia SEGURA:</strong> Valor recomendado (max diff + 15%)</li>
+      <li><strong>Clasificación:</strong> ✅ CONFIABLE (≥80%) | ⚠️ INESTABLE | ❌ NO CONFIABLE</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4>🧪 Probar TODAS</h4>
+    <p>El botón <code>🧪 Todas</code> evalúa <strong>todas las condiciones juntas</strong> con su lógica (AND/OR, require/block) y te muestra exactamente cuáles pasan, cuáles fallan, y si el script se ejecutaría o no.</p>
+  </div>
+
+  <div class="tip">
+    <strong>💡 Regla de oro:</strong> Usá la <strong>tolerancia SEGURA</strong> que sugiere el diagnóstico, no la mínima. El juego renderiza distinto cada frame y necesitás cubrir el peor caso.
+  </div>
+</section>
+
+<!-- ═══════════ 8. EJECUCIÓN ═══════════ -->
+<section id="ejecucion">
+  <h2>▶️ Ejecución</h2>
+
+  <h3>Controles</h3>
+  <table>
+    <tr><th>Botón</th><th>Acción</th></tr>
+    <tr><td><code>▶ Iniciar</code></td><td>Ejecuta toda la playlist (scripts habilitados)</td></tr>
+    <tr><td><code>▶1 Seleccionado</code></td><td>Ejecuta solo el script seleccionado</td></tr>
+    <tr><td><code>☐ Detener</code></td><td>Detiene la ejecución actual</td></tr>
+  </table>
+
+  <h3>Hotkey global</h3>
+  <p>Por defecto <span class="key">F10</span> inicia/detiene la ejecución incluso con el juego en primer plano. Podés cambiarla desde el desplegable.</p>
+
+  <h3>Barra de progreso</h3>
+  <p>Muestra el progreso global: scripts ejecutados / total. En modo <code>infinite</code> muestra el progreso por loop.</p>
+
+  <h3>Mini Bar</h3>
+  <p>Activala desde <strong>Ver → Mini Bar</strong>. Es una barra flotante y compacta que muestra:</p>
+  <ul>
+    <li>Script actual y progreso</li>
+    <li>Tiempo restante estimado</li>
+    <li>Barra de progreso</li>
+  </ul>
+  <p>Ideal para gaming en un solo monitor: se superpone al juego sin estorbar.</p>
+</section>
+
+<!-- ═══════════ 9. ATAJOS ═══════════ -->
+<section id="atajos">
+  <h2>⌨️ Atajos y tips</h2>
+
+  <table>
+    <tr><th>Atajo</th><th>Acción</th></tr>
+    <tr><td><span class="key">F10</span></td><td>Iniciar / Detener ejecución</td></tr>
+    <tr><td>Doble clic en celda</td><td>Editar valor (reps, duración, pausa)</td></tr>
+    <tr><td>Clic derecho en script</td><td>Menú contextual (condiciones, clonar, etc.)</td></tr>
+    <tr><td><span class="key">Ctrl</span> + clic</td><td>Seleccionar múltiples scripts</td></tr>
+    <tr><td><span class="key">Shift</span> + clic</td><td>Seleccionar rango de scripts</td></tr>
+  </table>
+
+  <div class="warn">
+    <strong>⚠️ Importante:</strong> Las duraciones deben ser realistas. Si un script tarda 30s en ejecutarse, poné <code>Dur: 30</code>. Un valor muy bajo causa que el siguiente script se ejecute antes de tiempo. Un valor muy alto desperdicia tiempo.
+  </div>
+
+  <div class="tip">
+    <strong>💡 Flujo recomendado para juegos:</strong>
+    <ol>
+      <li>Creá un perfil por juego</li>
+      <li>Agrupá scripts por "fase" (compra, farm, venta)</li>
+      <li>Configurá condiciones visuales en los scripts clave</li>
+      <li>Usá <code>repeat_until</code> para acciones repetitivas con condición de salida</li>
+      <li>Agregá un script fallback con <code>❌ Bloquear</code> para pantallas inesperadas</li>
+      <li>Probá con <code>▶1 Seleccionado</code> antes de lanzar el loop completo</li>
+    </ol>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  TinyTask Orchestrator v1.2.0 · Creado por Roderick + Hefesto 🛠️
+</footer>
+
+</body>
+</html>
