@@ -1882,8 +1882,8 @@ class OrchestratorApp:
 
         # ── Botón Probar (diagnóstico) ──
         def _test_icon():
-            """Diagnostica el icono seleccionado: captura pantalla,
-            busca el mejor match, y muestra min_diff + recomendación."""
+            """Diagnostica el icono: 5 capturas rapidas, muestra
+            min/max/avg y tasa de acierto real a la tolerancia actual."""
             sel = tree.selection()
             if not sel:
                 self._dark_dialog("Seleccionar",
@@ -1900,67 +1900,83 @@ class OrchestratorApp:
                 return
 
             current_threshold = cond.get("threshold", 0.08)
-            search_region = cond.get("region")  # [x, y, w, h] o None
+            search_region = cond.get("region")
 
-            # Mostrar "probando..."
-            self._set_status("🔍 Probando icono...", DARK_COLORS["purple"])
-            dlg.update()
+            from icon_detector import diagnose_icon
 
-            try:
-                from icon_detector import diagnose_icon
-                result = diagnose_icon(ipath, region=search_region, threshold=current_threshold)
-            except Exception as e:
-                self._dark_dialog("Error", f"No se pudo probar el icono:\n{e}", "error")
+            # ── 5 tests rápidos ──
+            diffs = []
+            hits = 0
+            for test_n in range(1, 6):
+                self._set_status(
+                    f"🔍 Probando... {test_n}/5", DARK_COLORS["purple"])
+                dlg.update()
+                try:
+                    result = diagnose_icon(
+                        ipath, region=search_region,
+                        threshold=current_threshold)
+                except Exception as e:
+                    self._dark_dialog("Error",
+                        f"No se pudo probar el icono:\n{e}", "error")
+                    return
+                d = result["min_diff"]
+                if d < 1.0:
+                    diffs.append(d)
+                if result["found"]:
+                    hits += 1
+
+            if not diffs:
+                self._dark_dialog("No encontrado",
+                    "No se encontró el icono en ninguna de las 5 pruebas.\n"
+                    "¿Está visible en pantalla?", "warning")
                 return
 
-            min_diff = result["min_diff"]
-            rec = result["recommendation"]
-            found = result["found"]
-            pos = result["position"]
-            icon_w, icon_h = result["icon_size"]
+            d_min = min(diffs)
+            d_max = max(diffs)
+            d_avg = sum(diffs) / len(diffs)
+            spread = d_max - d_min
+            rate = hits / 5 * 100
 
-            # Construir mensaje
-            pct = min_diff * 100
-            if found:
-                status_emoji = "✅"
-                status_text = "MATCHEA"
-                status_color = "green"
+            # ── Determinar tolerancia segura ──
+            safe_tolerance = round(d_max * 1.15, 3)
+
+            # ── Construir mensaje ──
+            if rate >= 80:
+                emoji, status = "✅", "CONFIABLE"
+                msg_type = "success"
+            elif rate >= 40:
+                emoji, status = "⚠️", "INESTABLE"
+                msg_type = "info"
             else:
-                status_emoji = "❌"
-                status_text = "NO matchea"
-                status_color = DARK_COLORS["yellow"]
+                emoji, status = "❌", "NO CONFIABLE"
+                msg_type = "info"
 
             msg = (
-                f"{status_emoji} Resultado: {status_text}\n\n"
+                f"{emoji} Tasa de acierto: {rate:.0f}% ({hits}/5) — {status}\n\n"
+                f"📊 Min diff:  {d_min:.4f} ({d_min*100:.1f}%)\n"
+                f"📊 Max diff:  {d_max:.4f} ({d_max*100:.1f}%)\n"
+                f"📊 Avg diff:  {d_avg:.4f} ({d_avg*100:.1f}%)\n"
+                f"📐 Variación: {spread:.4f} ({(spread/d_avg)*100:.0f}% de dispersión)\n\n"
                 f"📏 Tolerancia actual: {current_threshold:.3f}\n"
-                f"📊 Diferencia real:  {min_diff:.4f} ({pct:.1f}%)\n"
-                f"💡 Tolerancia sugerida: {rec:.3f}\n"
-                f"📐 Tamaño icono: {icon_w}×{icon_h} px\n"
+                f"💡 Tolerancia SEGURA:  {safe_tolerance:.3f}\n"
+                f"   (max diff + 15% margen)\n"
             )
-            if pos:
-                msg += f"📍 Posición: ({pos[0]}, {pos[1]})\n"
 
-            if min_diff >= 1.0:
-                msg += "\n⚠️ No se encontró ningún candidato.\n"
-                msg += "¿El icono está visible en pantalla ahora mismo?"
-            elif not found and min_diff < 0.40:
-                msg += f"\n💡 Subí la tolerancia a {rec:.3f} o más.\n"
-                msg += "\n⚠️ Probá 3 veces y usá el min_diff más alto\n"
-                msg += "— el juego puede renderizar distinto cada frame."
-            elif min_diff > 0.35:
-                msg += ("\n⚠️ La diferencia es muy alta (>35%).\n"
-                        "¿El icono es un recorte EXACTO de lo que\n"
-                        "se ve en pantalla? Sin bordes extra.\n"
-                        "\n⚠️ Probá 3 veces y usá el min_diff más alto\n"
-                        "— el juego puede renderizar distinto cada frame.")
-            elif found:
-                msg += "\n⚠️ Verificá 3 veces: si algún test falla,\n"
-                msg += "usá el min_diff más alto como tolerancia."
+            if search_region:
+                msg += f"\n🎯 Con región de búsqueda"
+            else:
+                msg += f"\n🌐 Buscando en toda la pantalla"
+
+            if rate < 100:
+                msg += (
+                    f"\n\n⚠️ El juego NO renderiza igual cada frame.\n"
+                    f"Usá la tolerancia SEGURA ({safe_tolerance:.3f})\n"
+                    f"para cubrir el peor caso."
+                )
 
             self._dark_dialog(
                 f"Diagnóstico — {os.path.basename(ipath)}",
-                msg,
-                "success" if found else "info"
+                msg, msg_type
             )
 
         ttk.Button(btn_frame, text="🔍 Probar", command=_test_icon,
