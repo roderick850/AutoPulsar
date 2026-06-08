@@ -18,22 +18,27 @@ except ImportError:
     HAS_MSS = False
 
 
-def _find_subimage(screenshot, icon, threshold=0.08):
+def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False):
     """Busca `icon` dentro de `screenshot`. Retorna (x, y) o None.
 
     Algoritmo en dos fases:
-    1. Búsqueda gruesa (paso grande) → candidato aproximado
-    2. Refinamiento fino (±step alrededor del candidato, paso=1)
-       → posición exacta
+    1. Busqueda gruesa (paso grande) -> candidato aproximado
+    2. Refinamiento fino (+-step alrededor del candidato, paso=1)
+       -> posicion exacta
 
-    threshold: 0.0 = match perfecto, 0.08 = 8% de tolerancia (más
+    threshold: 0.0 = match perfecto, 0.08 = 8% de tolerancia (mas
     permisivo para manejar diferencias de renderizado entre captura
-    y ejecución).
+    y ejecucion).
+
+    Si return_debug=True, retorna (best_pos, min_diff) en vez de
+    solo best_pos -- util para diagnostico.
     """
     sw, sh = screenshot.size
     iw, ih = icon.size
 
     if iw > sw or ih > sh:
+        if return_debug:
+            return None, float("inf")
         return None
 
     # Convertir a RGB para comparación consistente
@@ -78,6 +83,8 @@ def _find_subimage(screenshot, icon, threshold=0.08):
                 best_pos = (x, y)
 
     if best_pos is None:
+        if return_debug:
+            return None, float("inf")
         return None
 
     # ── Fase 2: refinamiento alrededor del mejor candidato ──
@@ -112,6 +119,8 @@ def _find_subimage(screenshot, icon, threshold=0.08):
                 min_diff = avg_diff
                 best_pos = (x, y)
 
+    if return_debug:
+        return best_pos, min_diff
     if min_diff < adjusted_threshold:
         return best_pos
     return None
@@ -236,6 +245,94 @@ def check_conditions(conditions):
         return True, None
     else:
         return False, "; ".join(reasons) if reasons else "condiciones no cumplidas"
+
+
+def diagnose_icon(icon_path, region=None, threshold=0.08):
+    """Diagnostica el matching de un icono contra la pantalla.
+
+    Captura la pantalla, busca el mejor match, y retorna un dict
+    con toda la informacion necesaria para ajustar la tolerancia.
+
+    Args:
+        icon_path: ruta a la imagen .png del icono
+        region: None = toda la pantalla, o (x, y, w, h) para region
+        threshold: tolerancia actual configurada (para comparar)
+
+    Returns:
+        dict con:
+        - found: bool, si matchea con el threshold actual
+        - min_diff: float, la menor diferencia encontrada (0.0-1.0)
+        - position: (x, y) o None, donde se encontro el mejor match
+        - icon_size: (w, h) del icono
+        - error: str o None, si hubo un error (missing, too_big, etc.)
+        - recommendation: float, tolerancia sugerida (min_diff * 1.2)
+    """
+    import os
+    from PIL import Image
+
+    if not os.path.exists(icon_path):
+        return {"found": False, "min_diff": 1.0, "position": None,
+                "icon_size": (0, 0), "error": "missing",
+                "recommendation": 0.08}
+
+    try:
+        icon = Image.open(icon_path)
+    except Exception:
+        return {"found": False, "min_diff": 1.0, "position": None,
+                "icon_size": (0, 0), "error": "invalid_file",
+                "recommendation": 0.08}
+
+    icon_size = icon.size
+    best_pos = None
+    best_diff = float("inf")
+    best_offset = (0, 0)
+
+    if HAS_MSS:
+        with mss.mss() as sct:
+            if region:
+                monitors = [{"left": region[0], "top": region[1],
+                            "width": region[2], "height": region[3]}]
+            else:
+                monitors = [sct.monitors[i] for i in range(1, len(sct.monitors))]
+
+            for monitor in monitors:
+                m_left = monitor.get("left", monitor.get("x", 0))
+                m_top = monitor.get("top", monitor.get("y", 0))
+                screenshot = sct.grab(monitor)
+                screenshot = Image.frombytes(
+                    "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+                pos, diff = _find_subimage(
+                    screenshot, icon, threshold, return_debug=True)
+
+                if pos is not None and diff < best_diff:
+                    best_diff = diff
+                    best_pos = (pos[0] + m_left, pos[1] + m_top)
+                    best_offset = (m_left, m_top)
+    else:
+        from PIL import ImageGrab
+        if region:
+            x, y, w, h = region
+            screenshot = ImageGrab.grab(
+                bbox=(x, y, x + w, y + h), all_screens=True)
+        else:
+            screenshot = ImageGrab.grab(all_screens=True)
+        pos, diff = _find_subimage(
+            screenshot, icon, threshold, return_debug=True)
+        if pos is not None:
+            best_pos = pos
+            best_diff = diff
+
+    found = best_pos is not None and best_diff < threshold
+    recommendation = round(best_diff * 1.2, 3) if best_diff < float("inf") else 0.08
+
+    return {
+        "found": found,
+        "min_diff": best_diff if best_diff < float("inf") else 1.0,
+        "position": best_pos,
+        "icon_size": icon_size,
+        "error": None,
+        "recommendation": recommendation,
+    }
 
 
 # ── Prueba rápida ──

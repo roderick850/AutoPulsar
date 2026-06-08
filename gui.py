@@ -1869,6 +1869,84 @@ class OrchestratorApp:
         ttk.Button(btn_frame, text="👁️ Ver", command=_preview_icon,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
+        # ── Botón Probar (diagnóstico) ──
+        def _test_icon():
+            """Diagnostica el icono seleccionado: captura pantalla,
+            busca el mejor match, y muestra min_diff + recomendación."""
+            sel = tree.selection()
+            if not sel:
+                self._dark_dialog("Seleccionar",
+                    "Selecciona una condición de la lista para probar.", "info")
+                return
+            i = int(sel[0])
+            if i < 0 or i >= len(cond_copy["items"]):
+                return
+            cond = cond_copy["items"][i]
+            ipath = cond.get("icon_path", "")
+            if not ipath or not os.path.exists(ipath):
+                self._dark_dialog("Sin icono",
+                    "Esta condición no tiene un icono asignado.", "warning")
+                return
+
+            current_threshold = cond.get("threshold", 0.08)
+
+            # Mostrar "probando..."
+            self._set_status("🔍 Probando icono...", DARK_COLORS["purple"])
+            dlg.update()
+
+            try:
+                from icon_detector import diagnose_icon
+                result = diagnose_icon(ipath, threshold=current_threshold)
+            except Exception as e:
+                self._dark_dialog("Error", f"No se pudo probar el icono:\n{e}", "error")
+                return
+
+            min_diff = result["min_diff"]
+            rec = result["recommendation"]
+            found = result["found"]
+            pos = result["position"]
+            icon_w, icon_h = result["icon_size"]
+
+            # Construir mensaje
+            pct = min_diff * 100
+            if found:
+                status_emoji = "✅"
+                status_text = "MATCHEA"
+                status_color = "green"
+            else:
+                status_emoji = "❌"
+                status_text = "NO matchea"
+                status_color = DARK_COLORS["yellow"]
+
+            msg = (
+                f"{status_emoji} Resultado: {status_text}\n\n"
+                f"📏 Tolerancia actual: {current_threshold:.3f}\n"
+                f"📊 Diferencia real:  {min_diff:.4f} ({pct:.1f}%)\n"
+                f"💡 Tolerancia sugerida: {rec:.3f}\n"
+                f"📐 Tamaño icono: {icon_w}×{icon_h} px\n"
+            )
+            if pos:
+                msg += f"📍 Posición: ({pos[0]}, {pos[1]})\n"
+
+            if min_diff >= 1.0:
+                msg += "\n⚠️ No se encontró ningún candidato.\n"
+                msg += "¿El icono está visible en pantalla ahora mismo?"
+            elif not found and min_diff < 0.40:
+                msg += f"\n💡 Subí la tolerancia a {rec:.3f} o más."
+            elif min_diff > 0.35:
+                msg += ("\n⚠️ La diferencia es muy alta (>35%).\n"
+                        "¿El icono es un recorte EXACTO de lo que\n"
+                        "se ve en pantalla? Sin bordes extra.")
+
+            self._dark_dialog(
+                f"Diagnóstico — {os.path.basename(ipath)}",
+                msg,
+                "success" if found else "info"
+            )
+
+        ttk.Button(btn_frame, text="🔍 Probar", command=_test_icon,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+
         # ── Reintentos ──
         retry_frame = ttk.LabelFrame(dlg, text="⏳ Reintentos", padding=5)
         retry_frame.pack(fill=tk.X, padx=8, pady=(8, 0))
