@@ -18,7 +18,7 @@ except ImportError:
     HAS_MSS = False
 
 
-def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False, fine=False):
+def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False):
     """Busca `icon` dentro de `screenshot`. Retorna (x, y) o None.
 
     Algoritmo en dos fases:
@@ -32,9 +32,6 @@ def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False, fine=Fa
 
     Si return_debug=True, retorna (best_pos, min_diff) en vez de
     solo best_pos -- util para diagnostico.
-
-    Si fine=True, usa paso=1 en fase 1 (exhaustivo, mas lento pero
-    preciso y repetible -- ideal para diagnostico).
     """
     sw, sh = screenshot.size
     iw, ih = icon.size
@@ -57,11 +54,7 @@ def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False, fine=Fa
     adjusted_threshold = threshold
 
     # Paso adaptativo: mas fino para iconos pequeños
-    # fine=True → exhaustivo (paso=1) para diagnostico preciso
-    if fine:
-        step = 1
-    else:
-        step = max(1, min(iw, ih) // 6)
+    step = max(1, min(iw, ih) // 6)
 
     # ── Fase 1: búsqueda gruesa ──
     min_diff = float("inf")
@@ -309,7 +302,7 @@ def diagnose_icon(icon_path, region=None, threshold=0.08):
                 screenshot = Image.frombytes(
                     "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
                 pos, diff = _find_subimage(
-                    screenshot, icon, threshold, return_debug=True, fine=True)
+                    screenshot, icon, threshold, return_debug=True)
 
                 if pos is not None and diff < best_diff:
                     best_diff = diff
@@ -324,7 +317,7 @@ def diagnose_icon(icon_path, region=None, threshold=0.08):
         else:
             screenshot = ImageGrab.grab(all_screens=True)
         pos, diff = _find_subimage(
-            screenshot, icon, threshold, return_debug=True, fine=True)
+            screenshot, icon, threshold, return_debug=True)
         if pos is not None:
             best_pos = pos
             best_diff = diff

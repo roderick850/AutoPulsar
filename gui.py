@@ -1932,11 +1932,18 @@ class OrchestratorApp:
                 msg += "\n⚠️ No se encontró ningún candidato.\n"
                 msg += "¿El icono está visible en pantalla ahora mismo?"
             elif not found and min_diff < 0.40:
-                msg += f"\n💡 Subí la tolerancia a {rec:.3f} o más."
+                msg += f"\n💡 Subí la tolerancia a {rec:.3f} o más.\n"
+                msg += "\n⚠️ Probá 3 veces y usá el min_diff más alto\n"
+                msg += "— el juego puede renderizar distinto cada frame."
             elif min_diff > 0.35:
                 msg += ("\n⚠️ La diferencia es muy alta (>35%).\n"
                         "¿El icono es un recorte EXACTO de lo que\n"
-                        "se ve en pantalla? Sin bordes extra.")
+                        "se ve en pantalla? Sin bordes extra.\n"
+                        "\n⚠️ Probá 3 veces y usá el min_diff más alto\n"
+                        "— el juego puede renderizar distinto cada frame.")
+            elif found:
+                msg += "\n⚠️ Verificá 3 veces: si algún test falla,\n"
+                msg += "usá el min_diff más alto como tolerancia."
 
             self._dark_dialog(
                 f"Diagnóstico — {os.path.basename(ipath)}",
