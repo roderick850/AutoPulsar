@@ -228,7 +228,11 @@ def check_conditions(conditions):
                 reasons.append(f"Requiere icono (sin ruta)")
             continue
 
-        found, error = check_icon(icon_path, cond.get("region"))
+        found, error = check_icon_multi(
+            icon_path, cond.get("region"),
+            threshold=cond.get("threshold", 0.08),
+            samples=cond.get("samples", 1),
+            confidence=cond.get("confidence", 1.0))
 
         if ctype == "require":
             results.append(found)       # debe estar → True si visible
@@ -253,6 +257,43 @@ def check_conditions(conditions):
         return True, None
     else:
         return False, "; ".join(reasons) if reasons else "condiciones no cumplidas"
+
+
+def check_icon_multi(icon_path, region=None, threshold=0.08,
+                     samples=1, confidence=1.0):
+    """Verifica un icono con múltiples capturas para mayor fiabilidad.
+
+    Captura la pantalla `samples` veces y cuenta cuántas matchean.
+    Retorna True si el porcentaje de aciertos >= confidence.
+
+    Args:
+        icon_path: ruta al icono .png
+        region: None o [x, y, w, h]
+        threshold: tolerancia
+        samples: cuántas capturas hacer (1 = single, igual que check_icon)
+        confidence: 0.0-1.0, porcentaje mínimo de aciertos
+
+    Returns:
+        (found, error_msg)
+        found = True si (hits / samples) >= confidence
+    """
+    if samples <= 1:
+        return check_icon(icon_path, region, threshold)
+
+    hits = 0
+    last_error = None
+    for _ in range(samples):
+        f, err = check_icon(icon_path, region, threshold)
+        if f:
+            hits += 1
+        else:
+            last_error = err
+
+    success_rate = hits / samples
+    if success_rate >= confidence:
+        return True, None
+    else:
+        return False, f"multi: {hits}/{samples} ({success_rate:.0%})"
 
 
 def diagnose_icon(icon_path, region=None, threshold=0.08):

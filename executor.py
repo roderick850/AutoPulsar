@@ -4,7 +4,7 @@ import time
 import os
 
 try:
-    from icon_detector import check_conditions, check_icon
+    from icon_detector import check_conditions, check_icon, check_icon_multi
     HAS_ICON_DETECTOR = True
 except ImportError:
     HAS_ICON_DETECTOR = False
@@ -67,10 +67,15 @@ def _normalize_conditions(item):
 
 
 def _check_icon_with_threshold(cond):
-    """Verifica un icono usando el threshold y región definidos en la condición."""
+    """Verifica un icono usando el threshold, región y multi-muestreo
+    definidos en la condición."""
     threshold = cond.get("threshold", 0.08)
     region = cond.get("region")  # [x, y, w, h] o None
-    return check_icon(cond.get("icon_path", ""), region, threshold)
+    samples = cond.get("samples", 1)
+    confidence = cond.get("confidence", 1.0)
+    return check_icon_multi(
+        cond.get("icon_path", ""), region, threshold,
+        samples=samples, confidence=confidence)
 
 
 def _evaluate_items(items, mode):

@@ -1630,8 +1630,14 @@ class OrchestratorApp:
                 tipo_display = "✅ Requerir" if ctype == "require" else "❌ Bloquear"
                 icon_display = os.path.basename(ipath) if ipath else "(sin icono)"
                 umbral = cond.get("threshold", 0.08)
+                samples = cond.get("samples", 1)
+                confidence = cond.get("confidence", 1.0)
+                if samples > 1:
+                    umbral_display = f"{umbral:.2f} | {samples}×{int(confidence*100)}%"
+                else:
+                    umbral_display = f"{umbral:.2f}"
                 tree.insert("", tk.END, iid=str(ci),
-                           values=(tipo_display, label, icon_display, f"{umbral:.2f}"))
+                           values=(tipo_display, label, icon_display, umbral_display))
 
         _refresh_cond_list()
 
@@ -1718,6 +1724,8 @@ class OrchestratorApp:
                         "icon_path": save_path,
                         "label": "",
                         "threshold": 0.08,
+                        "samples": 1,
+                        "confidence": 1.0,
                         "region": [search_x, search_y, search_w, search_h],
                     })
                     _refresh_cond_list()
@@ -1861,6 +1869,56 @@ class OrchestratorApp:
                 thr_win.geometry(f"+{pdx}+{pdy}")
 
         ttk.Button(btn_frame, text="🎯 Tolerancia", command=_edit_threshold,
+                   style="Compact.TButton").pack(side=tk.LEFT, padx=2)
+
+        # ── Botón Muestreo ──
+        def _edit_sampling():
+            sel = tree.selection()
+            if not sel:
+                return
+            i = int(sel[0])
+            if i < 0 or i >= len(cond_copy["items"]):
+                return
+
+            smp_win = ctk.CTkToplevel(dlg, fg_color=c["bg"])
+            smp_win.title("Muestreo")
+            smp_win.geometry("280x160")
+            smp_win.resizable(False, False)
+            smp_win.transient(dlg)
+            smp_win.grab_set()
+
+            cur_samples = cond_copy["items"][i].get("samples", 1)
+            cur_conf = cond_copy["items"][i].get("confidence", 1.0)
+
+            ttk.Label(smp_win, text="Verificar N veces:", style="Compact.TLabel").pack(pady=(10, 2))
+            samples_var = tk.IntVar(value=cur_samples)
+            ttk.Spinbox(smp_win, from_=1, to=20, width=6,
+                        textvariable=samples_var).pack()
+
+            ttk.Label(smp_win, text="Aceptar si ≥ X% matchea:", style="Compact.TLabel").pack(pady=(10, 2))
+            conf_pct_var = tk.IntVar(value=int(cur_conf * 100))
+            ttk.Spinbox(smp_win, from_=10, to=100, increment=10, width=6,
+                        textvariable=conf_pct_var).pack()
+            ttk.Label(smp_win, text="%", style="Compact.TLabel").pack()
+
+            ttk.Label(smp_win,
+                text=f"Ej: 5 veces al 60% → necesita 3+ aciertos",
+                style="Dim.TLabel").pack(pady=(6, 0))
+
+            def _save_smp():
+                cond_copy["items"][i]["samples"] = samples_var.get()
+                cond_copy["items"][i]["confidence"] = conf_pct_var.get() / 100.0
+                smp_win.destroy()
+                _refresh_cond_list()
+
+            ttk.Button(smp_win, text="Guardar", command=_save_smp).pack(pady=8)
+            smp_win.bind("<Return>", lambda e: _save_smp())
+            smp_win.update_idletasks()
+            pdx = dlg.winfo_rootx() + (dlg.winfo_width() - smp_win.winfo_width()) // 2
+            pdy = dlg.winfo_rooty() + (dlg.winfo_height() - smp_win.winfo_height()) // 2
+            smp_win.geometry(f"+{pdx}+{pdy}")
+
+        ttk.Button(btn_frame, text="📊 Muestreo", command=_edit_sampling,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
         def _preview_icon():
