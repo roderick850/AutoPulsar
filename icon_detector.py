@@ -57,9 +57,9 @@ def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False):
     # Si la captura es de una region chica (search area), usar paso mas fino
     total_area = sw * sh
     if total_area < 600000:  # ~800x700, tipico de una region con padding
-        step = max(1, min(iw, ih) // 10)
+        step = max(1, min(iw, ih) // 12)  # muy fino en regiones
     else:
-        step = max(1, min(iw, ih) // 6)
+        step = max(1, min(iw, ih) // 8)   # mas fino que antes (era //6)
 
     # ── Fase 1: búsqueda gruesa ──
     min_diff = float("inf")
@@ -93,14 +93,17 @@ def _find_subimage(screenshot, icon, threshold=0.08, return_debug=False):
         return None
 
     # ── Fase 2: refinamiento alrededor del mejor candidato ──
+    # Radio amplio (step*3) para no perder el match real por un
+    # falso positivo en la fase gruesa
     bx, by = best_pos
-    x_start = max(0, bx - step)
-    y_start = max(0, by - step)
-    x_end = min(sw - iw, bx + step)
-    y_end = min(sh - ih, by + step)
+    refine_radius = step * 3
+    x_start = max(0, bx - refine_radius)
+    y_start = max(0, by - refine_radius)
+    x_end = min(sw - iw, bx + refine_radius)
+    y_end = min(sh - ih, by + refine_radius)
 
-    # Muestreo más fino para la fase de refinamiento
-    fine_sample = max(1, min(iw, ih) // 12)
+    # Muestreo mas denso para la fase de refinamiento
+    fine_sample = max(1, min(iw, ih) // 16)
 
     for y in range(y_start, y_end + 1):
         for x in range(x_start, x_end + 1):
