@@ -420,6 +420,8 @@ class Executor(threading.Thread):
             self._safe_callback(
                 "on_skip_icon", idx,
                 os.path.basename(item["path"]))
+            # Pequeña pausa para que el usuario vea el estado amarillo
+            time.sleep(0.4)
             return False
 
         return True
