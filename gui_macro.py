@@ -354,8 +354,10 @@ class MacroEditorWindow(ctk.CTkToplevel):
     def _render_row(self, idx, act):
         row = ttk.Frame(self._inner, style="Surface.TFrame")
 
-        # ── Etiqueta del índice ──
+        # ── Etiqueta del índice + tiempo acumulado ──
+        cum_time = self._cumulative_time(idx)
         ttk.Label(row, text=f"#{idx+1}", style="Dim.TLabel", width=4).pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Label(row, text=format_s(cum_time), style="Dim.TLabel", width=7, anchor="e").pack(side=tk.LEFT, padx=(0, 4))
 
         # ── Keycap visual ──
         if act["action"] == "press" and act.get("key") == "__wait__":
@@ -367,11 +369,10 @@ class MacroEditorWindow(ctk.CTkToplevel):
             cap.pack(side=tk.LEFT, padx=2)
 
             ttk.Label(row, text="Espera", style="Compact.TLabel", anchor="w", width=14).pack(side=tk.LEFT, padx=4)
-            ttk.Label(row, text=format_s(wait), style="Dim.TLabel", width=8).pack(side=tk.LEFT)
 
-            # Editar tiempo
             wait_var = tk.StringVar(value=str(wait))
-            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT, padx=2)
+            ttk.Label(row, text="s:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         elif act["action"] == "press":
@@ -387,17 +388,17 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
             ttk.Label(row, text="Presionar", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
 
-            # Duración
+            # Duración de presión
             dur = act.get("press_duration", 0.15)
             dur_var = tk.StringVar(value=str(dur))
-            ttk.Label(row, text="Dur:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
-            # Espera
+            # Espera antes del siguiente
             wait = act.get("wait_before", 0.5)
             wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="Antes:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Label(row, text="Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
@@ -416,9 +417,17 @@ class MacroEditorWindow(ctk.CTkToplevel):
             ttk.Label(row, text=f"Click {btn}", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
             ttk.Label(row, text=f"({act.get('x',0)},{act.get('y',0)})", style="Dim.TLabel", width=12).pack(side=tk.LEFT)
 
+            # Duración de presión del click
+            dur = act.get("press_duration", 0.05)
+            dur_var = tk.StringVar(value=str(dur))
+            ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
+            ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
+
+            # Espera antes del siguiente
             wait = act.get("wait_before", 0.5)
             wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="Antes:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Label(row, text="Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
@@ -435,6 +444,14 @@ class MacroEditorWindow(ctk.CTkToplevel):
         if 0 <= idx < len(self.actions):
             self.actions[idx][attr] = value
             self._refresh_list()
+
+    def _cumulative_time(self, idx):
+        """Tiempo acumulado desde el inicio hasta el inicio de la acción idx."""
+        total = 0.0
+        for i in range(idx):
+            act = self.actions[i]
+            total += act.get("wait_before", 0) + act.get("press_duration", 0)
+        return total
 
     # ── Canvas helpers ────────────────────────────────────
 

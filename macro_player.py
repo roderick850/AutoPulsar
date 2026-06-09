@@ -107,12 +107,26 @@ class MacroPlayer:
 
     def _execute(self):
         try:
+            prev_time = 0.0
             for i, ev in enumerate(self.events):
+                if self._stop_event.is_set():
+                    break
+
+                # Esperar el tiempo real entre eventos (como se grabó)
+                wait = ev["time"] - prev_time
+                if wait > 0:
+                    slept = 0.0
+                    step = 0.01  # dormir en micro-pasos para poder cancelar
+                    while slept < wait and not self._stop_event.is_set():
+                        time.sleep(min(step, wait - slept))
+                        slept += step
+
                 if self._stop_event.is_set():
                     break
 
                 self._callback("on_event", i, ev)
                 self._play_event(ev)
+                prev_time = ev["time"]
 
             self._callback("on_finish")
         except pyautogui.FailSafeException:
