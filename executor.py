@@ -482,20 +482,22 @@ class Executor(threading.Thread):
         """Modo first_match: ejecuta SOLO el primer ítem cuyas condiciones
         se cumplan, luego re-evalúa con una nueva captura de pantalla.
 
-        Bucle infinito hasta que el usuario presione F10 (stop_event)."""
+        El contador de loop solo incrementa cuando un ítem realmente se
+        ejecuta — no durante el escaneo.  Muestra "Comparando..." mientras
+        busca el primer match."""
         time.sleep(1)
 
         total_reps_per_loop = sum(
             item.get("repetitions", 1) for item in self.playlist)
         completed_reps_total = 0
-        loop_num = 0
+        execution_count = 0   # solo incrementa cuando ejecuta
+        scan_count = 0         # cada iteración de escaneo
 
         self._safe_callback("on_start_run", None,
                             total_reps_per_loop, None)
 
         while not self.stop_event.is_set():
-            loop_num += 1
-            self._safe_callback("on_start_loop", loop_num, None, None)
+            scan_count += 1
 
             # ── Capturar pantalla UNA vez para todas las condiciones ──
             screenshots = None
@@ -521,8 +523,6 @@ class Executor(threading.Thread):
                 has_conditions = bool(conditions.get("items"))
 
                 if has_conditions:
-                    # Verificar condiciones contra la captura (o captura fresca)
-                    # silent=True → no mostrar "icono no encontrado" durante el escaneo
                     ok = self._check_conditions_with_retry(
                         conditions, idx, item, screenshots, silent=True)
                     if not ok:
@@ -530,7 +530,12 @@ class Executor(threading.Thread):
 
                 # ── ¡Match! Ejecutar este ítem ──
                 matched = True
-                self._safe_callback("on_start_item", idx, name, reps, "⚙️" if has_conditions else "")
+                execution_count += 1
+
+                # Mostrar loop en la barra (solo cuando ejecuta)
+                self._safe_callback("on_start_loop", execution_count, None, None)
+                self._safe_callback("on_start_item", idx, name, reps,
+                                    "⚙️" if has_conditions else "")
 
                 for r in range(reps):
                     if self.stop_event.is_set():
@@ -539,7 +544,7 @@ class Executor(threading.Thread):
                     self._safe_callback(
                         "on_repeat", completed_reps_total + 1,
                         None, total_reps_per_loop,
-                        name, r + 1, reps, loop_num, None)
+                        name, r + 1, reps, execution_count, None)
 
                     try:
                         self._launch_item(item)
@@ -570,14 +575,16 @@ class Executor(threading.Thread):
                 break  # solo UN ítem por iteración → volver a evaluar
 
             if not matched and not self.stop_event.is_set():
-                # Ningún ítem coincidió — breve pausa y reintentar
+                # Ningún ítem coincidió — mostrar "Comparando..." y reintentar
+                self._safe_callback("on_skip_icon", -1,
+                                    f"Comparando... (escaneo #{scan_count})")
                 time.sleep(0.5)
 
         self._safe_callback(
             "on_finish",
             "Detenido" if self.stop_event.is_set() else "Completado",
             completed_reps_total, None, total_reps_per_loop,
-            loop_num, None)
+            execution_count, None)
 
     def _safe_callback(self, name, *args):
         cb = self.callbacks.get(name)
