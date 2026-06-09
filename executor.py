@@ -382,12 +382,15 @@ class Executor(threading.Thread):
                     "El hilo principal no pudo lanzar el .exe")
             time.sleep(2.0)
 
-    def _check_conditions_with_retry(self, conditions, idx, item, screenshots=None):
+    def _check_conditions_with_retry(self, conditions, idx, item, screenshots=None,
+                                     silent=False):
         """Verifica condiciones con reintentos + fallback.
 
         Si screenshots es provisto, reutiliza esas capturas en vez de
         tomar nuevas — evita N capturas para N ítems.
-        """
+
+        Si silent es True, no muestra callbacks de skip/retry/fallback
+        (útil para escaneo silencioso en modo first_match)."""
         retry_cfg = conditions.get("retry", {})
         retry_enabled = retry_cfg.get("enabled", False)
         retry_count = retry_cfg.get("count", 1) if retry_enabled else 1
@@ -405,10 +408,11 @@ class Executor(threading.Thread):
                 cond_met = True
                 break
             if attempt < retry_count - 1 and retry_delay > 0:
-                self._safe_callback(
-                    "on_retry_wait", idx,
-                    os.path.basename(item["path"]),
-                    attempt + 1, retry_count)
+                if not silent:
+                    self._safe_callback(
+                        "on_retry_wait", idx,
+                        os.path.basename(item["path"]),
+                        attempt + 1, retry_count)
                 slept = 0.0
                 while (slept < retry_delay
                        and not self.stop_event.is_set()):
@@ -425,34 +429,38 @@ class Executor(threading.Thread):
                 fallback_script = fallback_cfg.get("script", "")
                 if (item["_consecutive_failures"] >= threshold
                         and fallback_script):
-                    self._safe_callback(
-                        "on_fallback_trigger", idx,
-                        os.path.basename(item["path"]),
-                        os.path.basename(fallback_script))
+                    if not silent:
+                        self._safe_callback(
+                            "on_fallback_trigger", idx,
+                            os.path.basename(item["path"]),
+                            os.path.basename(fallback_script))
                     try:
                         subprocess.Popen(fallback_script, shell=True)
                     except Exception as e:
-                        self._safe_callback(
-                            "on_fallback_error",
-                            os.path.basename(fallback_script),
-                            str(e))
+                        if not silent:
+                            self._safe_callback(
+                                "on_fallback_error",
+                                os.path.basename(fallback_script),
+                                str(e))
                     item["_consecutive_failures"] = 0
 
                     fb_delay = fallback_cfg.get("delay_after", 0)
                     if fb_delay > 0:
-                        self._safe_callback(
-                            "on_fallback_wait", idx,
-                            os.path.basename(item["path"]),
-                            fb_delay)
+                        if not silent:
+                            self._safe_callback(
+                                "on_fallback_wait", idx,
+                                os.path.basename(item["path"]),
+                                fb_delay)
                         slept = 0.0
                         while (slept < fb_delay
                                and not self.stop_event.is_set()):
                             time.sleep(0.1)
                             slept += 0.1
 
-            self._safe_callback(
-                "on_skip_icon", idx,
-                os.path.basename(item["path"]))
+            if not silent:
+                self._safe_callback(
+                    "on_skip_icon", idx,
+                    os.path.basename(item["path"]))
             return False
 
         return True
@@ -514,8 +522,9 @@ class Executor(threading.Thread):
 
                 if has_conditions:
                     # Verificar condiciones contra la captura (o captura fresca)
+                    # silent=True → no mostrar "icono no encontrado" durante el escaneo
                     ok = self._check_conditions_with_retry(
-                        conditions, idx, item, screenshots)
+                        conditions, idx, item, screenshots, silent=True)
                     if not ok:
                         continue  # condición no cumplida → siguiente ítem
 
