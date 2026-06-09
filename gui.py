@@ -18,6 +18,15 @@ from gui_macro import MacroEditorWindow
 
 
 def format_time(seconds):
+    if isinstance(seconds, float) and seconds == int(seconds):
+        seconds = int(seconds)
+    if isinstance(seconds, float):
+        # Mostrar un decimal para tiempos fraccionarios
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        m = int(seconds // 60)
+        s = seconds % 60
+        return f"{m}m {s:.1f}s"
     seconds = int(seconds)
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
@@ -945,12 +954,11 @@ class OrchestratorApp:
 
     def _calc_item_time(self, item):
         if item.get("type") == "macro" and "macro_data" in item:
-            total = 0
+            total = 0.0
             for act in item["macro_data"].get("actions", []):
                 total += act.get("wait_before", 0) + act.get("press_duration", 0.05)
-            task_time = max(int(total) + 1, 1)
-            overhead = self._LAUNCH_BUFFER
-            return max(task_time + overhead, 0)
+            # Macros: tiempo exacto, sin overhead de lanzamiento
+            return max(total, 0.1)
 
         reps = item["repetitions"]
         duration = item["duration"]
@@ -2382,7 +2390,7 @@ class OrchestratorApp:
     def _add_macro(self):
         """Abre el editor de macros para grabar/editar una secuencia."""
         def on_save(macro_data):
-            total_time = 0
+            total_time = 0.0
             for act in macro_data["actions"]:
                 total_time += act.get("wait_before", 0) + act.get("press_duration", 0.05)
             item = {
@@ -2391,7 +2399,7 @@ class OrchestratorApp:
                 "name": macro_data["name"],
                 "macro_data": macro_data,
                 "repetitions": 1,
-                "duration": max(int(total_time) + 1, 1),
+                "duration": round(total_time, 1),
                 "pause": 0,
                 "enabled": True,
                 "first_loop_only": False,
@@ -2410,13 +2418,13 @@ class OrchestratorApp:
         actions = macro_data.get("actions", [])
 
         def on_save(new_macro_data):
-            total_time = 0
+            total_time = 0.0
             for act in new_macro_data["actions"]:
                 total_time += act.get("wait_before", 0) + act.get("press_duration", 0.05)
             item["name"] = new_macro_data["name"]
             item["macro_data"] = new_macro_data
             item["path"] = f"macro:{new_macro_data['name']}"
-            item["duration"] = max(int(total_time) + 1, 1)
+            item["duration"] = round(total_time, 1)
             self._refresh_list()
 
         MacroEditorWindow(self.root, on_save=on_save,

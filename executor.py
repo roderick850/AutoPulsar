@@ -227,11 +227,13 @@ class Executor(threading.Thread):
 
                         completed_reps_total += 1
 
-                        slept = 0.0
-                        while (slept < duration
-                               and not self.stop_event.is_set()):
-                            time.sleep(0.1)
-                            slept += 0.1
+                        # Macros ya reproducen su timing, no esperar de nuevo
+                        if item.get("type") != "macro":
+                            slept = 0.0
+                            while (slept < duration
+                                   and not self.stop_event.is_set()):
+                                time.sleep(0.1)
+                                slept += 0.1
 
                         if self.stop_event.is_set():
                             break
@@ -306,11 +308,13 @@ class Executor(threading.Thread):
 
                         completed_reps_total += 1
 
-                        slept = 0.0
-                        while (slept < duration
-                               and not self.stop_event.is_set()):
-                            time.sleep(0.1)
-                            slept += 0.1
+                        # Macros ya reproducen su timing, no esperar de nuevo
+                        if item.get("type") != "macro":
+                            slept = 0.0
+                            while (slept < duration
+                                   and not self.stop_event.is_set()):
+                                time.sleep(0.1)
+                                slept += 0.1
 
                         if self.stop_event.is_set():
                             break
