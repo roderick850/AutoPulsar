@@ -413,6 +413,12 @@ def check_conditions_on_screenshots(screenshots, conditions):
     Igual lógica que check_conditions() pero sin volver a capturar
     la pantalla — reutiliza las screenshots pasadas como argumento.
 
+    Si una condición tiene ``region`` o ``samples > 1``, se hace
+    fallback a ``check_icon`` / ``check_icon_multi`` con captura
+    fresca — la región requiere un área de búsqueda acotada que no
+    se puede extraer de una captura full-screen sin offsets de
+    monitor, y el multi-muestreo necesita capturas distintas.
+
     Args:
         screenshots: lista de PIL Image (una por monitor)
         conditions: dict con mode + items (ver check_conditions)
@@ -439,15 +445,27 @@ def check_conditions_on_screenshots(screenshots, conditions):
                 reasons.append("Requiere icono (sin ruta)")
             continue
 
-        # Buscar en todas las screenshots hasta encontrar (o no)
-        found = False
-        for screenshot in screenshots:
-            f, _ = check_icon_on_screenshot(
-                screenshot, icon_path,
-                threshold=cond.get("threshold", 0.08))
-            if f:
-                found = True
-                break
+        region = cond.get("region")
+        samples = cond.get("samples", 1)
+        threshold = cond.get("threshold", 0.08)
+        confidence = cond.get("confidence", 1.0)
+
+        # ── Fallback a captura fresca si hay región o multi-muestreo ──
+        if region or samples > 1:
+            found, _ = check_icon_multi(
+                icon_path, region,
+                threshold=threshold,
+                samples=samples,
+                confidence=confidence)
+        else:
+            # Buscar en todas las screenshots cacheadas hasta encontrar
+            found = False
+            for screenshot in screenshots:
+                f, _ = check_icon_on_screenshot(
+                    screenshot, icon_path, threshold=threshold)
+                if f:
+                    found = True
+                    break
 
         if ctype == "require":
             results.append(found)
