@@ -384,43 +384,21 @@ def diagnose_icon(icon_path, region=None, threshold=0.08):
     }
 
 
-def check_icon_on_screenshot(screenshot, icon_path, threshold=0.08):
-    """Verifica si el icono está en una captura ya hecha (sin volver a capturar).
-
-    Args:
-        screenshot: PIL Image ya capturada
-        icon_path: ruta a la imagen .png del icono
-        threshold: 0.0-1.0, tolerancia
-
-    Returns:
-        (found, error_msg)
-    """
-    if not os.path.exists(icon_path):
-        return False, "missing"
-    try:
-        icon = Image.open(icon_path)
-    except Exception:
-        return False, "missing"
-    result = _find_subimage(screenshot, icon, threshold)
-    if result is not None:
-        return True, None
-    return False, "not_found"
-
-
 def check_conditions_on_screenshots(screenshots, conditions):
     """Evalúa condiciones contra una lista de capturas ya hechas.
 
     Igual lógica que check_conditions() pero sin volver a capturar
     la pantalla — reutiliza las screenshots pasadas como argumento.
 
-    Si una condición tiene ``region`` o ``samples > 1``, se hace
-    fallback a ``check_icon`` / ``check_icon_multi`` con captura
-    fresca — la región requiere un área de búsqueda acotada que no
-    se puede extraer de una captura full-screen sin offsets de
-    monitor, y el multi-muestreo necesita capturas distintas.
+    Las regiones se manejan recortando la screenshot de cada monitor
+    al área de búsqueda (usando los offsets devueltos por
+    ``capture_all_screens()``).  Solo se hace fallback a captura
+    fresca cuando ``samples > 1`` (multi-muestreo necesita frames
+    distintos).
 
     Args:
-        screenshots: lista de PIL Image (una por monitor)
+        screenshots: lista de tuplas (PIL.Image, (left, top))
+                     tal como las retorna capture_all_screens()
         conditions: dict con mode + items (ver check_conditions)
 
     Returns:
@@ -450,8 +428,8 @@ def check_conditions_on_screenshots(screenshots, conditions):
         threshold = cond.get("threshold", 0.08)
         confidence = cond.get("confidence", 1.0)
 
-        # ── Fallback a captura fresca si hay región o multi-muestreo ──
-        if region or samples > 1:
+        # ── Fallback a captura fresca solo para multi-muestreo ──
+        if samples > 1:
             found, _ = check_icon_multi(
                 icon_path, region,
                 threshold=threshold,
@@ -460,9 +438,10 @@ def check_conditions_on_screenshots(screenshots, conditions):
         else:
             # Buscar en todas las screenshots cacheadas hasta encontrar
             found = False
-            for screenshot in screenshots:
+            for screenshot, offset in screenshots:
                 f, _ = check_icon_on_screenshot(
-                    screenshot, icon_path, threshold=threshold)
+                    screenshot, icon_path, threshold=threshold,
+                    region=region, offset=offset)
                 if f:
                     found = True
                     break
@@ -492,22 +471,96 @@ def check_conditions_on_screenshots(screenshots, conditions):
 
 
 def capture_all_screens():
-    """Captura todos los monitores y retorna una lista de PIL Image.
+    """Captura todos los monitores y retorna (screenshot, offset) por cada uno.
 
     Returns:
-        list[PIL.Image]: una imagen por monitor
+        list[tuple[PIL.Image, (left, top)]]:
+            Cada elemento es (imagen, (offset_x, offset_y)) donde offset
+            es la posición absoluta del monitor en el escritorio virtual.
+            Esto permite recortar regiones de la captura correctamente.
     """
     if HAS_MSS:
         with mss.mss() as sct:
             screenshots = []
             for monitor in sct.monitors[1:]:
+                left = monitor.get("left", monitor.get("x", 0))
+                top = monitor.get("top", monitor.get("y", 0))
                 screenshot = sct.grab(monitor)
-                screenshots.append(Image.frombytes(
-                    "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"))
+                screenshots.append((
+                    Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"),
+                    (left, top)
+                ))
             return screenshots
     else:
         from PIL import ImageGrab
-        return [ImageGrab.grab(all_screens=True)]
+        return [(ImageGrab.grab(all_screens=True), (0, 0))]
+
+
+def _crop_to_region(screenshot, offset, region):
+    """Recorta una screenshot al área de la región, ajustando por el offset del monitor.
+
+    Args:
+        screenshot: PIL Image de un monitor completo
+        offset: (left, top) del monitor en coordenadas absolutas
+        region: [x, y, w, h] en coordenadas absolutas
+
+    Returns:
+        PIL Image recortada, o None si la región no solapa con este monitor.
+    """
+    rx, ry, rw, rh = region
+    ox, oy = offset
+    sw, sh = screenshot.size
+
+    # Calcular intersección entre región y este monitor
+    ix = max(rx, ox)
+    iy = max(ry, oy)
+    ix2 = min(rx + rw, ox + sw)
+    iy2 = min(ry + rh, oy + sh)
+
+    if ix >= ix2 or iy >= iy2:
+        return None  # sin solapamiento
+
+    # Coordenadas relativas al screenshot
+    cx = ix - ox
+    cy = iy - oy
+    cw = ix2 - ix
+    ch = iy2 - iy
+
+    return screenshot.crop((cx, cy, cx + cw, cy + ch))
+
+
+def check_icon_on_screenshot(screenshot, icon_path, threshold=0.08, region=None,
+                              offset=(0, 0)):
+    """Verifica si el icono está en una captura ya hecha (sin volver a capturar).
+
+    Args:
+        screenshot: PIL Image ya capturada (un monitor completo)
+        icon_path: ruta a la imagen .png del icono
+        threshold: 0.0-1.0, tolerancia
+        region: None = buscar en toda la captura,
+                [x, y, w, h] = buscar solo en esa área (coords absolutas)
+        offset: (left, top) del monitor en el escritorio virtual
+
+    Returns:
+        (found, error_msg)
+    """
+    if not os.path.exists(icon_path):
+        return False, "missing"
+    try:
+        icon = Image.open(icon_path)
+    except Exception:
+        return False, "missing"
+
+    search_area = screenshot
+    if region:
+        search_area = _crop_to_region(screenshot, offset, region)
+        if search_area is None:
+            return False, "not_found"  # región fuera de este monitor
+
+    result = _find_subimage(search_area, icon, threshold)
+    if result is not None:
+        return True, None
+    return False, "not_found"
 
 
 # ── Prueba rápida ──
