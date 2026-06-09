@@ -14,6 +14,7 @@ from config_manager import (load_config, save_config, get_config_path,
 from executor import Executor
 from hotkey import HotkeyListener
 from mini_bar import MiniBar, format_time as mini_format_time
+from gui_macro import MacroEditorWindow
 
 
 def format_time(seconds):
@@ -797,6 +798,9 @@ class OrchestratorApp:
         ttk.Button(btn_frame, text="➕ Agregar", command=self._add_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
+        ttk.Button(btn_frame, text="🎬 Macro", command=self._add_macro, style="Compact.TButton").pack(
+            side=tk.LEFT, padx=2
+        )
         ttk.Button(btn_frame, text="✏️ Editar", command=self._edit_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
@@ -940,12 +944,18 @@ class OrchestratorApp:
     _INITIAL_SLEEP = 1.0     # Initial sleep before first execution
 
     def _calc_item_time(self, item):
+        if item.get("type") == "macro" and "macro_data" in item:
+            total = 0
+            for act in item["macro_data"].get("actions", []):
+                total += act.get("wait_before", 0) + act.get("press_duration", 0.05)
+            task_time = max(int(total) + 1, 1)
+            overhead = self._LAUNCH_BUFFER
+            return max(task_time + overhead, 0)
+
         reps = item["repetitions"]
         duration = item["duration"]
         pause = item["pause"]
-        # Last repetition has no trailing pause
         task_time = (duration + pause) * reps - pause
-        # Each execution has a launch buffer overhead
         overhead = self._LAUNCH_BUFFER * reps
         return max(task_time + overhead, 0)
 
@@ -2363,6 +2373,29 @@ class OrchestratorApp:
             win.destroy()
 
         ttk.Button(form, text="Guardar", command=save, style="Compact.TButton").pack()
+
+    def _add_macro(self):
+        """Abre el editor de macros para grabar/editar una secuencia."""
+        def on_save(macro_data):
+            total_time = 0
+            for act in macro_data["actions"]:
+                total_time += act.get("wait_before", 0) + act.get("press_duration", 0.05)
+            item = {
+                "type": "macro",
+                "path": f"macro:{macro_data['name']}",
+                "name": macro_data["name"],
+                "macro_data": macro_data,
+                "repetitions": 1,
+                "duration": max(int(total_time) + 1, 1),
+                "pause": 0,
+                "enabled": True,
+                "first_loop_only": False,
+                "group": None,
+            }
+            self.playlist.append(item)
+            self._refresh_list()
+
+        MacroEditorWindow(self.root, on_save=on_save)
 
     def _edit_script(self):
         sel = self.tree.selection()
