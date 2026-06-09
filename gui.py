@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 import customtkinter as ctk
 import os
+import sys
 import subprocess
 import threading
 import time
@@ -15,6 +16,13 @@ from executor import Executor
 from hotkey import HotkeyListener
 from mini_bar import MiniBar, format_time as mini_format_time
 from gui_macro import MacroEditorWindow
+
+
+def _get_icon_path():
+    """Resolve app_icon.ico path in both dev and frozen (PyInstaller) modes."""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, 'app_icon.ico')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app_icon.ico')
 
 
 def format_time(seconds):
@@ -104,6 +112,10 @@ class OrchestratorApp:
         self.root = root
         self.root.title("AutoPulsar")
         self.root.minsize(600, 380)
+        try:
+            self.root.iconbitmap(_get_icon_path())
+        except Exception:
+            pass
         self.root.configure(fg_color=DARK_COLORS["bg"])
 
         # Dark title bar on Windows (with retry logic)

@@ -10,6 +10,7 @@ Al cerrar (X) se oculta; se restaura desde el menú View.
 import tkinter as tk
 from tkinter import ttk
 import os
+import sys
 import ctypes
 
 # ── Dark Theme (mismos colores que la app principal) ──────────────
@@ -103,6 +104,14 @@ class MiniBar:
         self.root.minsize(300, 36)
         self.root.maxsize(1200, 36)
         self.root.resizable(True, False)
+
+        try:
+            if getattr(sys, 'frozen', False):
+                self.root.iconbitmap(os.path.join(sys._MEIPASS, 'app_icon.ico'))
+            else:
+                self.root.iconbitmap(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app_icon.ico'))
+        except Exception:
+            pass
 
         # Always-on-top por defecto, configurable
         pinned = self.settings.get("mini_bar_pinned", True)

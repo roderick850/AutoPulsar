@@ -26,12 +26,25 @@ def _get_app_dir():
     """Return the directory where config should be saved.
     If running from a PyInstaller .exe, use APPDATA.
     Otherwise, use the script's own directory."""
+    import shutil
+
     if getattr(sys, "frozen", False):
         # Running from a compiled .exe (PyInstaller)
         app_data = os.path.join(
             os.environ.get("APPDATA", os.path.expanduser("~")),
             "AutoPulsar",
         )
+        # ── Migration from TinyTaskOrchestrator ──
+        if not os.path.exists(app_data):
+            old_dir = os.path.join(
+                os.environ.get("APPDATA", os.path.expanduser("~")),
+                "TinyTaskOrchestrator",
+            )
+            if os.path.isdir(old_dir):
+                try:
+                    shutil.copytree(old_dir, app_data)
+                except Exception:
+                    pass  # non-critical — user can copy manually
         if not os.path.exists(app_data):
             os.makedirs(app_data)
         return app_data

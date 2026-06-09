@@ -8,6 +8,7 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import json
 import os
+import sys
 import ctypes
 
 # ── Aplicar título oscuro en Windows 10/11 ──
@@ -74,6 +75,13 @@ for i in range(1, 13):
     KEY_TYPES[f"f{i}"] = "function"
 
 
+def _get_icon_path():
+    """Resolve app_icon.ico path in both dev and frozen (PyInstaller) modes."""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, 'app_icon.ico')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app_icon.ico')
+
+
 def key_color(key):
     ktype = KEY_TYPES.get(key.lower(), "default")
     return KEY_COLORS.get(ktype, KEY_COLORS["default"])
@@ -119,6 +127,10 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self.grab_set()
         self._center_on(parent)
         _apply_dark_titlebar(self)
+        try:
+            self.iconbitmap(_get_icon_path())
+        except Exception:
+            pass
 
         self.on_save = on_save
         self.actions = initial_actions or []
