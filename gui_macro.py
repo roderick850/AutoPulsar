@@ -138,7 +138,6 @@ class MacroEditorWindow(ctk.CTkToplevel):
         ttk.Button(top, text="➕ Añadir Tecla", command=self._add_key, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
         ttk.Button(top, text="➕ Añadir Click", command=self._add_click, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
         ttk.Button(top, text="➕ Añadir Espera", command=self._add_wait, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
-        ttk.Button(top, text="➕ Añadir Mover", command=self._add_move, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
 
         # ── Status ──
         status_frame = ttk.Frame(self, padding=(8, 0, 8, 4))
@@ -269,15 +268,21 @@ class MacroEditorWindow(ctk.CTkToplevel):
             self.actions.append({"action": "press", "key": "__wait__", "press_duration": 0, "wait_before": float(dlg.result)})
             self._refresh_list()
 
-    def _add_move(self):
-        dlg = _InputDialog(self, "Añadir Movimiento", "X:", "500", "Y:", "300", "Espera antes (s):", "0.1")
-        if dlg.result:
-            self.actions.append({"action": "move", "x": int(dlg.result[0]), "y": int(dlg.result[1]), "press_duration": 0, "wait_before": float(dlg.result[2])})
-            self._refresh_list()
-
     def _remove_action(self, idx):
         if 0 <= idx < len(self.actions):
             del self.actions[idx]
+            self._refresh_list()
+
+    def _move_up(self, idx):
+        """Mueve una acción una posición hacia arriba."""
+        if 1 <= idx < len(self.actions):
+            self.actions[idx], self.actions[idx - 1] = self.actions[idx - 1], self.actions[idx]
+            self._refresh_list()
+
+    def _move_down(self, idx):
+        """Mueve una acción una posición hacia abajo."""
+        if 0 <= idx < len(self.actions) - 1:
+            self.actions[idx], self.actions[idx + 1] = self.actions[idx + 1], self.actions[idx]
             self._refresh_list()
 
     def _edit_action(self, idx):
@@ -318,17 +323,6 @@ class MacroEditorWindow(ctk.CTkToplevel):
                 act["y"] = int(dlg.result[2])
                 act["press_duration"] = float(dlg.result[3])
                 act["wait_before"] = float(dlg.result[4])
-                self._refresh_list()
-
-        elif act["action"] == "move":
-            dlg = _InputDialog(self, "Editar Movimiento",
-                "X:", str(act.get("x", 0)),
-                "Y:", str(act.get("y", 0)),
-                "Espera antes (s):", str(act.get("wait_before", 0.1)))
-            if dlg.result:
-                act["x"] = int(dlg.result[0])
-                act["y"] = int(dlg.result[1])
-                act["wait_before"] = float(dlg.result[2])
                 self._refresh_list()
 
     def _clear_all(self):
@@ -428,21 +422,9 @@ class MacroEditorWindow(ctk.CTkToplevel):
             ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
-        elif act["action"] == "move":
-            bg, fg = KEY_COLORS["move"]
-            cap = tk.Canvas(row, width=48, height=36, bg=C["surface"], highlightthickness=0, bd=0)
-            cap.create_line(10, 18, 38, 18, fill=fg, width=2, arrow=tk.LAST)
-            cap.pack(side=tk.LEFT, padx=2)
-
-            ttk.Label(row, text=f"Mover ({act.get('x',0)},{act.get('y',0)})", style="Compact.TLabel", width=24, anchor="w").pack(side=tk.LEFT, padx=4)
-
-            wait = act.get("wait_before", 0.1)
-            wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="Antes:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
-
-        # Botones de acción
+        # Botones de reorden y acción
+        ttk.Button(row, text="⬆", width=2, command=lambda i=idx: self._move_up(i)).pack(side=tk.RIGHT, padx=1)
+        ttk.Button(row, text="⬇", width=2, command=lambda i=idx: self._move_down(i)).pack(side=tk.RIGHT, padx=1)
         ttk.Button(row, text="✎", width=2, command=lambda i=idx: self._edit_action(i)).pack(side=tk.RIGHT, padx=1)
         ttk.Button(row, text="🗑", width=2, command=lambda i=idx: self._remove_action(i)).pack(side=tk.RIGHT, padx=1)
 

@@ -138,13 +138,17 @@ class MacroPlayer:
                 pass
 
         elif t == "mouse_move":
-            x, y = ev["x"], ev["y"]
-            pyautogui.moveTo(x, y, duration=0.05)
+            x, y = ev.get("x", 0), ev.get("y", 0)
+            # Movimiento rápido y fluido con easing
+            pyautogui.moveTo(x, y, duration=0.03, tween=pyautogui.easeOutQuad)
 
         elif t == "mouse_click":
             btn = ev.get("button", "left")
+            x, y = ev.get("x"), ev.get("y")
             if btn in ("left", "right", "middle"):
-                pyautogui.mouseDown(x=ev.get("x"), y=ev.get("y"), button=btn)
+                # Mover primero al punto del click (fluido)
+                pyautogui.moveTo(x, y, duration=0.03, tween=pyautogui.easeOutQuad)
+                pyautogui.mouseDown(button=btn)
 
         elif t == "mouse_release":
             btn = ev.get("button", "left")
@@ -245,16 +249,6 @@ def events_to_actions(events):
                 "y": ev.get("y", 0),
                 "press_duration": 0.05,
                 "wait_before": wait,
-            })
-            prev_time = ev["time"]
-
-        elif ev["type"] == "mouse_move":
-            actions.append({
-                "action": "move",
-                "x": ev["x"],
-                "y": ev["y"],
-                "wait_before": wait,
-                "press_duration": 0,
             })
             prev_time = ev["time"]
 
