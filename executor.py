@@ -92,11 +92,12 @@ def _evaluate_items(items, mode):
     return False, reasons
 
 
-class Executor:
+class Executor(threading.Thread):
     """Ejecuta la playlist en un hilo separado."""
 
     def __init__(self, playlist, settings, callbacks,
                  stop_event, launch_event):
+        super().__init__(daemon=True)
         self.playlist = playlist
         self.settings = settings
         self.callbacks = callbacks
