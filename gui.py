@@ -1315,8 +1315,14 @@ class OrchestratorApp:
 
         elif info[0] == "script":
             idx = info[1]
-            menu.add_command(label="⚙️ Condiciones",
-                           command=lambda i=idx: self._edit_conditions(i))
+            item = self.playlist[idx]
+
+            if item.get("type") == "macro":
+                menu.add_command(label="🎬 Editar macro",
+                               command=lambda i=idx: self._edit_macro(i))
+            else:
+                menu.add_command(label="⚙️ Condiciones",
+                               command=lambda i=idx: self._edit_conditions(i))
             menu.add_separator()
             menu.add_command(label="📁 Agrupar seleccionados",
                            command=self._group_selected)
@@ -2397,6 +2403,26 @@ class OrchestratorApp:
 
         MacroEditorWindow(self.root, on_save=on_save)
 
+    def _edit_macro(self, idx):
+        """Abre el editor de macros para editar una macro existente."""
+        item = self.playlist[idx]
+        macro_data = item.get("macro_data", {})
+        name = macro_data.get("name", item.get("name", "Macro"))
+        actions = macro_data.get("actions", [])
+
+        def on_save(new_macro_data):
+            total_time = 0
+            for act in new_macro_data["actions"]:
+                total_time += act.get("wait_before", 0) + act.get("press_duration", 0.05)
+            item["name"] = new_macro_data["name"]
+            item["macro_data"] = new_macro_data
+            item["path"] = f"macro:{new_macro_data['name']}"
+            item["duration"] = max(int(total_time) + 1, 1)
+            self._refresh_list()
+
+        MacroEditorWindow(self.root, on_save=on_save,
+                          initial_actions=actions, initial_name=name)
+
     def _edit_script(self):
         sel = self.tree.selection()
         if not sel:
@@ -2408,6 +2434,11 @@ class OrchestratorApp:
             return
         idx = info[1]
         item = self.playlist[idx]
+
+        # Si es una macro, abrir el editor de macros
+        if item.get("type") == "macro":
+            self._edit_macro(idx)
+            return
 
         win = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         win.title("Editar script")
