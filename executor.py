@@ -114,8 +114,9 @@ class Executor(threading.Thread):
         loop_mode = self.settings.get("loop_mode", "once")
         loop_count = self.settings.get("loop_count", 1)
         loop_delay = self.settings.get("loop_delay", 0)
+        first_match_mode = (loop_mode == "first_match")
 
-        if loop_mode == "infinite":
+        if loop_mode == "infinite" or loop_mode == "first_match":
             max_loops = None
         elif loop_mode == "fixed":
             max_loops = loop_count
@@ -339,6 +340,10 @@ class Executor(threading.Thread):
 
                         if self.stop_event.is_set():
                             break
+
+            # ── Modo first_match: ejecutó un ítem → volver a evaluar ──
+            if first_match_mode and not self.stop_event.is_set():
+                break
 
             # Delay entre loops
             if ((max_loops is None or current_loop < max_loops)

@@ -721,7 +721,7 @@ class OrchestratorApp:
         mode_combo = ttk.Combobox(
             loop_frame,
             textvariable=self.loop_mode_var,
-            values=["once", "fixed", "infinite"],
+            values=["once", "fixed", "infinite", "first_match"],
             width=10,
             state="readonly")
         mode_combo.pack(side=tk.LEFT, padx=2)
@@ -993,7 +993,7 @@ class OrchestratorApp:
             mode = self.loop_mode_var.get()
             count = self._parse_int(self.loop_count_var, 1) if mode == "fixed" else 1
             delay = self._parse_int(self.loop_delay_var, 0)
-        if mode == "infinite":
+        if mode == "infinite" or mode == "first_match":
             return None  # Infinite
         # first_loop_only items count only once regardless of loop count
         once_time = sum(self._calc_item_time(item) for item in target
@@ -1012,7 +1012,7 @@ class OrchestratorApp:
 
     def _on_loop_mode_change(self, event):
         mode = self.loop_mode_var.get()
-        if mode == "infinite":
+        if mode == "infinite" or mode == "first_match":
             self.loop_count_entry.config(state="disabled")
         else:
             self.loop_count_entry.config(state="normal")
