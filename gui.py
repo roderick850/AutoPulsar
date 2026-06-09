@@ -3130,14 +3130,14 @@ class OrchestratorApp:
             self.mini_bar.update("Deteniendo...", 0, 1, mini_format_time(int(elapsed)), True)
 
     def _do_launch(self, path):
-        """Launch the .exe using os.startfile, the most native Windows way.
-        This is exactly what happens when you double-click a file in Explorer.
-        It runs completely detached from Python with zero inheritance issues.
-        
-        On failure, does NOT set launch_event — the executor will timeout
-        and report the error properly instead of silently continuing."""
+        """Launch the .exe using os.startfile, or handle macro playback.
+        Macros start with 'Macro:' prefix and are already played by the executor
+        — we just acknowledge by setting launch_event."""
         try:
-            if os.name == "nt":
+            if path.startswith("Macro:"):
+                # Macro — ya se ejecutó en el executor, solo confirmar
+                pass
+            elif os.name == "nt":
                 os.startfile(path)
             else:
                 subprocess.Popen([path], shell=False)
