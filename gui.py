@@ -102,7 +102,7 @@ def _apply_dark_titlebar(toplevel, retries=5):
 class OrchestratorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("TinyTask Orchestrator")
+        self.root.title("AutoPulsar")
         self.root.minsize(600, 380)
         self.root.configure(fg_color=DARK_COLORS["bg"])
 
@@ -238,7 +238,7 @@ class OrchestratorApp:
             font=("Segoe UI", 9), borderwidth=1, relief="solid")
         help_menu.add_command(label="📖 Manual de Usuario",
                               command=self._open_manual)
-        help_menu.add_command(label="ℹ️ Acerca de TinyTask Orchestrator",
+        help_menu.add_command(label="ℹ️ Acerca de AutoPulsar",
                               command=self._menu_about)
         help_mb.config(menu=help_menu)
 
@@ -289,7 +289,7 @@ class OrchestratorApp:
 
     def _update_title(self):
         """Actualizar el título de la ventana con el perfil activo."""
-        self.root.title(f"TinyTask Orchestrator — [{self._current_profile}]")
+        self.root.title(f"AutoPulsar — [{self._current_profile}]")
 
     def _new_profile(self):
         """Crear un nuevo perfil vacío."""
@@ -489,7 +489,7 @@ class OrchestratorApp:
             return
 
         # Copiar a temp para que el navegador pueda abrirlo con imágenes
-        tmpdir = tempfile.mkdtemp(prefix="tto_manual_")
+        tmpdir = tempfile.mkdtemp(prefix="ap_manual_")
         shutil.copy(manual_path, os.path.join(tmpdir, "manual.html"))
         if img_dir and os.path.isdir(img_dir):
             tmp_img = os.path.join(tmpdir, "manual_images")
@@ -501,11 +501,13 @@ class OrchestratorApp:
     def _menu_about(self):
         """Mostrar diálogo Acerca de."""
         msg = (
-            "TinyTask Orchestrator v1.2.0\n\n"
-            "Automatización de tareas con ejecución\n"
-            "por tiempos fijos, loops y hotkeys globales.\n\n"
-            "Agrupamiento de scripts — organizá tareas\n"
-            "en grupos y movelos como bloques. 📁\n\n"
+            "AutoPulsar v2.0.0\n\n"
+            "Grabador y reproductor de macros\n"
+            "de teclado y ratón con condiciones visuales.\n\n"
+            "Macros nativas — graba, edita y reproduce\n"
+            "secuencias sin depender de TinyTask. 🎬\n\n"
+            "Agrupamiento de scripts — organiza tareas\n"
+            "en grupos y muévelos como bloques. 📁\n\n"
             "Modo Mini Bar para gaming en monitor único.\n\n"
             "Creado por Roderick + Hefesto 🛠️"
         )
@@ -804,10 +806,10 @@ class OrchestratorApp:
         btn_frame = ttk.Frame(self.root)
         btn_frame.pack(fill=tk.X, padx=5, pady=(0, 3))
 
-        ttk.Button(btn_frame, text="➕ Agregar", command=self._add_script, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="🎬 Macro", command=self._add_macro, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(btn_frame, text="🎬 Macro", command=self._add_macro, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="➕ Agregar", command=self._add_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
         ttk.Button(btn_frame, text="✏️ Editar", command=self._edit_script, style="Compact.TButton").pack(
@@ -2310,7 +2312,7 @@ class OrchestratorApp:
 
     def _add_script(self):
         path = filedialog.askopenfilename(
-            title="Seleccionar script TinyTask",
+            title="Seleccionar ejecutable",
             filetypes=[("Ejecutables", "*.exe"), ("Todos", "*.*")])
         if not path:
             return

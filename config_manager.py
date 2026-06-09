@@ -30,7 +30,7 @@ def _get_app_dir():
         # Running from a compiled .exe (PyInstaller)
         app_data = os.path.join(
             os.environ.get("APPDATA", os.path.expanduser("~")),
-            "TinyTaskOrchestrator",
+            "AutoPulsar",
         )
         if not os.path.exists(app_data):
             os.makedirs(app_data)

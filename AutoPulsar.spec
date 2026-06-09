@@ -27,7 +27,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='TinyTaskOrchestrator',
+    name='AutoPulsar',
     icon='app_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,

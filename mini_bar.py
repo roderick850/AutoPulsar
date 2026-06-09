@@ -1,5 +1,5 @@
 """
-TinyTask Orchestrator — Mini Bar
+AutoPulsar — Mini Bar
 ================================
 Compacta ventana always-on-top que muestra el progreso de ejecución.
 Ideal para gaming en monitores únicos — no tapa el juego.
@@ -98,7 +98,7 @@ class MiniBar:
 
         # Crear Toplevel independiente
         self.root = tk.Toplevel(app.root)
-        self.root.title("TinyTask — Mini")
+        self.root.title("AutoPulsar — Mini")
         self.root.configure(bg=DARK_COLORS["bg"])
         self.root.minsize(300, 36)
         self.root.maxsize(1200, 36)

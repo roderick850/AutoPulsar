@@ -112,7 +112,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
     def __init__(self, parent, on_save=None, initial_actions=None, initial_name=""):
         super().__init__(parent, fg_color=C["bg"])
-        self.title("Editor de Macros — TinyTask Orchestrator")
+        self.title("Editor de Macros — AutoPulsar")
         self.geometry("950x650")
         self.minsize(700, 400)
         self.transient(parent)
