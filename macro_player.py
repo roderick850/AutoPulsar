@@ -182,6 +182,9 @@ class MacroPlayer:
         elif t == "scroll":
             pyautogui.scroll(ev.get("dy", 0))
 
+        elif t == "wait":
+            pass  # evento dummy — la pausa ya se hizo en _execute
+
 
 def events_to_actions(events):
     """
@@ -320,5 +323,10 @@ def actions_to_events(actions):
 
         elif act["action"] == "scroll":
             events.append({"type": "scroll", "dx": act.get("dx", 0), "dy": act.get("dy", 0), "x": 0, "y": 0, "time": round(t, 4)})
+
+    # ── Si la última acción es __wait__, generar un evento dummy ──
+    #     para que la reproducción espere ese tiempo antes de terminar.
+    if actions and actions[-1].get("key") == "__wait__":
+        events.append({"type": "wait", "time": round(t, 4)})
 
     return events

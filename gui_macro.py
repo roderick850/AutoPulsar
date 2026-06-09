@@ -264,9 +264,16 @@ class MacroEditorWindow(ctk.CTkToplevel):
             self._refresh_list()
 
     def _add_wait(self):
-        dlg = _SimpleInput(self, "Añadir Espera", "Segundos:", "0.5")
+        """Añade una pausa al inicio o final de la macro."""
+        dlg = _WaitDialog(self)
         if dlg.result:
-            self.actions.append({"action": "press", "key": "__wait__", "press_duration": 0, "wait_before": float(dlg.result)})
+            seconds, position = dlg.result
+            action = {"action": "press", "key": "__wait__", "press_duration": 0, "wait_before": seconds}
+            if position == "start":
+                # Insertar al principio — ajustar wait_before de la primera acción real
+                self.actions.insert(0, action)
+            else:
+                self.actions.append(action)
             self._refresh_list()
 
     def _remove_action(self, idx):
@@ -599,6 +606,60 @@ class _SimpleInput(ctk.CTkToplevel):
 
     def _ok(self):
         self.result = self._var.get()
+        self.destroy()
+
+    def _center_on(self, parent):
+        self.update_idletasks()
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        px, py = parent.winfo_x(), parent.winfo_y()
+        dw, dh = self.winfo_width(), self.winfo_height()
+        if pw < 100 or ph < 100:
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry(f"+{(sw - dw)//2}+{(sh - dh)//2}")
+        else:
+            self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
+
+class _WaitDialog(ctk.CTkToplevel):
+    """Diálogo para añadir pausa: segundos + posición (inicio/final)."""
+    def __init__(self, parent):
+        super().__init__(parent, fg_color=C["bg"])
+        self.title("Añadir Espera")
+        self.result = None
+
+        frm = ttk.Frame(self, padding=15)
+        frm.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frm, text="Segundos:", style="Compact.TLabel").pack(anchor="w", pady=(6, 4))
+        self._sec_var = tk.StringVar(value="0.5")
+        ttk.Entry(frm, textvariable=self._sec_var, width=10).pack(fill=tk.X)
+
+        ttk.Label(frm, text="Posición:", style="Compact.TLabel").pack(anchor="w", pady=(12, 4))
+        self._pos_var = tk.StringVar(value="end")
+        rb_frame = ttk.Frame(frm)
+        rb_frame.pack(fill=tk.X)
+        ttk.Radiobutton(rb_frame, text="Al inicio (antes de todo)", variable=self._pos_var, value="start").pack(anchor="w")
+        ttk.Radiobutton(rb_frame, text="Al final (después de todo)", variable=self._pos_var, value="end").pack(anchor="w")
+
+        btn_frame = ttk.Frame(frm)
+        btn_frame.pack(fill=tk.X, pady=(12, 0))
+        ttk.Button(btn_frame, text="Cancelar", command=self.destroy, style="Compact.TButton").pack(side=tk.RIGHT, padx=3)
+        ttk.Button(btn_frame, text="Aceptar", command=self._ok, style="Accent.TButton").pack(side=tk.RIGHT, padx=3)
+
+        self.transient(parent)
+        self.grab_set()
+        self.geometry("320x220")
+        self.resizable(False, False)
+        self._center_on(parent)
+        frm.after(100, lambda: frm.winfo_children()[1].focus_set())
+
+    def _ok(self):
+        try:
+            seconds = float(self._sec_var.get())
+        except ValueError:
+            seconds = 0.5
+        self.result = (seconds, self._pos_var.get())
         self.destroy()
 
     def _center_on(self, parent):
