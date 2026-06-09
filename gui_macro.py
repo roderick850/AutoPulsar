@@ -498,7 +498,6 @@ class MacroEditorWindow(ctk.CTkToplevel):
 class _InputDialog(ctk.CTkToplevel):
     """Diálogo para pedir varios valores de texto."""
     def __init__(self, parent, title, *fields):
-        # fields es una secuencia de pares: label, default, label, default, ...
         super().__init__(parent, fg_color=C["bg"])
         self.title(title)
         self.result = None
@@ -507,6 +506,7 @@ class _InputDialog(ctk.CTkToplevel):
         frm.pack(fill=tk.BOTH, expand=True)
 
         self._vars = []
+        n_fields = len(fields) // 2
         for i in range(0, len(fields), 2):
             lbl = fields[i]
             default = fields[i+1]
@@ -522,23 +522,37 @@ class _InputDialog(ctk.CTkToplevel):
 
         self.transient(parent)
         self.grab_set()
-        self.geometry("380x250")
+        # Geometría dinámica según número de campos
+        h = 120 + n_fields * 48
+        self.geometry(f"380x{h}")
         self.resizable(False, False)
         self._center_on(parent)
 
         # Foco en el primer campo
-        frm.after(100, lambda: frm.winfo_children()[1].focus_set())
+        frm.after(100, lambda: self._focus_first(frm))
 
     def _ok(self):
         self.result = tuple(v.get() for v in self._vars)
         self.destroy()
+
+    def _focus_first(self, frm):
+        for child in frm.winfo_children():
+            if isinstance(child, ttk.Entry):
+                child.focus_set()
+                return
 
     def _center_on(self, parent):
         self.update_idletasks()
         pw, ph = parent.winfo_width(), parent.winfo_height()
         px, py = parent.winfo_x(), parent.winfo_y()
         dw, dh = self.winfo_width(), self.winfo_height()
-        self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        # Fallback si la ventana padre aún no tiene dimensiones reales
+        if pw < 100 or ph < 100:
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry(f"+{(sw - dw)//2}+{(sh - dh)//2}")
+        else:
+            self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
 
 class _SimpleInput(ctk.CTkToplevel):
@@ -562,9 +576,10 @@ class _SimpleInput(ctk.CTkToplevel):
 
         self.transient(parent)
         self.grab_set()
-        self.geometry("300x130")
+        self.geometry("320x150")
         self.resizable(False, False)
         self._center_on(parent)
+        # Foco en el entry
         frm.after(100, lambda: frm.winfo_children()[1].focus_set())
 
     def _ok(self):
@@ -576,4 +591,9 @@ class _SimpleInput(ctk.CTkToplevel):
         pw, ph = parent.winfo_width(), parent.winfo_height()
         px, py = parent.winfo_x(), parent.winfo_y()
         dw, dh = self.winfo_width(), self.winfo_height()
-        self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        if pw < 100 or ph < 100:
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry(f"+{(sw - dw)//2}+{(sh - dh)//2}")
+        else:
+            self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")

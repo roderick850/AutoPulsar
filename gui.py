@@ -957,8 +957,10 @@ class OrchestratorApp:
             total = 0.0
             for act in item["macro_data"].get("actions", []):
                 total += act.get("wait_before", 0) + act.get("press_duration", 0.05)
-            # Macros: tiempo exacto, sin overhead de lanzamiento
-            return max(total, 0.1)
+            reps = item.get("repetitions", 1)
+            pause = item.get("pause", 0)
+            # Sin overhead de lanzamiento para macros, pero con reps y pause
+            return max((total + pause) * reps - pause, 0.1)
 
         reps = item["repetitions"]
         duration = item["duration"]
