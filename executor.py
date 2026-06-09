@@ -106,38 +106,57 @@ class Executor(threading.Thread):
 
     def run(self):
         """Ejecuta la playlist completa (loop + ítems)."""
-        max_loops = self.settings.get("max_loops", 1)
-        loop_delay = self.settings.get("loop_delay", 0)
-        infinite = (max_loops == 0)
+        if len(self.playlist) == 0:
+            self._safe_callback("on_finish", "Lista vacía", 0, 0, 0, 0)
+            return
 
-        completed_reps_total = 0
+        loop_mode = self.settings.get("loop_mode", "once")
+        loop_count = self.settings.get("loop_count", 1)
+        loop_delay = self.settings.get("loop_delay", 0)
+
+        if loop_mode == "infinite":
+            max_loops = None
+        elif loop_mode == "fixed":
+            max_loops = loop_count
+        else:
+            max_loops = 1
+
         total_reps_per_loop = sum(
-            item.get("repetitions", 1)
-            for item in self.playlist
-            if not item.get("first_loop_only", False))
-        once_reps = sum(
-            item.get("repetitions", 1)
-            for item in self.playlist
-            if item.get("first_loop_only", False))
-        total_global_reps = once_reps + total_reps_per_loop * (
-            max_loops if not infinite else 99999)
+            item.get("repetitions", 1) for item in self.playlist)
+
+        once_reps = sum(item.get("repetitions", 1) for item in self.playlist
+                        if item.get("first_loop_only", False))
+        repeat_reps = total_reps_per_loop - once_reps
+
+        if max_loops is None:
+            total_global_reps = None
+        else:
+            total_global_reps = once_reps + repeat_reps * max_loops
 
         current_loop = 0
-        while infinite or current_loop < max_loops:
+        completed_reps_total = 0
+
+        time.sleep(1)
+
+        self._safe_callback("on_start_run", total_global_reps,
+                            total_reps_per_loop, max_loops)
+
+        while True:
             if self.stop_event.is_set():
                 break
 
+            if max_loops is not None and current_loop >= max_loops:
+                break
+
             current_loop += 1
-            self._safe_callback(
-                "on_start_loop", current_loop,
-                None if infinite else max_loops,
-                total_global_reps)
+
+            self._safe_callback("on_start_loop", current_loop,
+                                max_loops, total_global_reps)
 
             for idx, item in enumerate(self.playlist):
                 if self.stop_event.is_set():
                     break
 
-                # Saltar ítems first_loop_only después del primer loop
                 if current_loop > 1 and item.get("first_loop_only", False):
                     continue
 
@@ -158,26 +177,24 @@ class Executor(threading.Thread):
                     mode_label)
 
                 if is_repeat_until and HAS_ICON_DETECTOR:
-                    # ── REPEAT UNTIL (unificado) ──
+                    # ── REPEAT UNTIL ──
                     repeat_cfg = conditions.get("repeat", {})
                     stop_when = repeat_cfg.get("stop_when", "match")
                     ru_max = repeat_cfg.get("max_iterations", 0)
                     ru_interval = repeat_cfg.get("check_interval", 0.5)
                     ru_unlimited = (ru_max == 0)
 
-                    # ── Verificar ANTES de la primera ejecución ──
                     ok, reason = _evaluate_items(
                         conditions.get("items", []),
                         conditions.get("mode", "and"))
                     if stop_when == "match":
                         condition_already_met = ok
-                    else:  # no_match
+                    else:
                         condition_already_met = not ok
 
                     if condition_already_met:
                         self._safe_callback(
-                            "on_repeat_until_done",
-                            idx, name, 0)
+                            "on_repeat_until_done", idx, name, 0)
                         self.stop_event.set()
                         break
 
@@ -208,7 +225,6 @@ class Executor(threading.Thread):
                             max_loops,
                         )
 
-                        # ── Lanzar script o macro ──
                         try:
                             self._launch_item(item)
                         except Exception as e:
@@ -217,7 +233,6 @@ class Executor(threading.Thread):
 
                         completed_reps_total += 1
 
-                        # ── Esperar duración completa ──
                         slept = 0.0
                         while (slept < duration
                                and not self.stop_event.is_set()):
@@ -227,7 +242,6 @@ class Executor(threading.Thread):
                         if self.stop_event.is_set():
                             break
 
-                        # ── Verificar condición al final ──
                         ok2, _ = _evaluate_items(
                             conditions.get("items", []),
                             conditions.get("mode", "and"))
@@ -238,8 +252,7 @@ class Executor(threading.Thread):
 
                         self._safe_callback(
                             "on_repeat_until_check", idx, name,
-                            iteration, ru_max,
-                            ok2, condition_met)
+                            iteration, ru_max, ok2, condition_met)
 
                         if condition_met:
                             self._safe_callback(
@@ -260,7 +273,6 @@ class Executor(threading.Thread):
                         if self.stop_event.is_set():
                             break
 
-                        # ── Verificar condiciones ANTES ──
                         if has_conditions:
                             ok = self._check_conditions_with_retry(
                                 conditions, idx, item)
