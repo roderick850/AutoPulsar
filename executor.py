@@ -168,16 +168,10 @@ class Executor(threading.Thread):
                 conditions, is_repeat_until = _normalize_conditions(item)
                 has_conditions = bool(conditions.get("items"))
 
-                mode_label = ""
-                if has_conditions and not is_repeat_until:
-                    mode_label = "⚙️"
-
-                self._safe_callback("on_start_item", idx, name,
-                    None if is_repeat_until else reps,
-                    mode_label)
-
                 if is_repeat_until and HAS_ICON_DETECTOR:
                     # ── REPEAT UNTIL ──
+                    self._safe_callback("on_start_item", idx, name, None, "")
+
                     repeat_cfg = conditions.get("repeat", {})
                     stop_when = repeat_cfg.get("stop_when", "match")
                     ru_max = repeat_cfg.get("max_iterations", 0)
@@ -269,11 +263,24 @@ class Executor(threading.Thread):
 
                 else:
                     # ── FIXED REPETITIONS ──
+                    # Verificar condiciones ANTES de mostrar "EJECUTANDO"
+                    first_ok = True
+                    if has_conditions:
+                        first_ok = self._check_conditions_with_retry(
+                            conditions, idx, item)
+
+                    if not first_ok:
+                        continue  # skip ya mostrado, pasar al siguiente ítem
+
+                    mode_label = "⚙️" if has_conditions else ""
+                    self._safe_callback("on_start_item", idx, name, reps, mode_label)
+
                     for r in range(reps):
                         if self.stop_event.is_set():
                             break
 
-                        if has_conditions:
+                        # Re-verificar para reps > 1
+                        if r > 0 and has_conditions:
                             ok = self._check_conditions_with_retry(
                                 conditions, idx, item)
                             if not ok:
@@ -420,10 +427,6 @@ class Executor(threading.Thread):
             self._safe_callback(
                 "on_skip_icon", idx,
                 os.path.basename(item["path"]))
-            # Pausa visible para que el usuario vea el estado amarillo
-            # antes de que el siguiente ítem lo sobrescriba
-            if not self.stop_event.is_set():
-                time.sleep(1.5)
             return False
 
         return True
