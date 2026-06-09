@@ -8,6 +8,25 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import json
 import os
+import ctypes
+
+# ── Aplicar título oscuro en Windows 10/11 ──
+def _apply_dark_titlebar(window):
+    """Habilita el título oscuro en la barra de título de Windows."""
+    if os.name != "nt":
+        return
+    try:
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(ctypes.c_int(1)),
+            ctypes.sizeof(ctypes.c_int(1)),
+        )
+    except Exception:
+        pass  # Pre-Windows 10 20H1 — la barra queda clara
 import threading
 
 from macro_recorder import MacroRecorder
@@ -99,6 +118,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
         self._center_on(parent)
+        _apply_dark_titlebar(self)
 
         self.on_save = on_save
         self.actions = initial_actions or []
@@ -253,12 +273,14 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
     def _add_key(self):
         dlg = _InputDialog(self, "Añadir Tecla", "Tecla:", "a", "Duración (s):", "0.15", "Espera antes (s):", "0.5")
+        self.wait_window(dlg)
         if dlg.result:
             self.actions.append({"action": "press", "key": dlg.result[0], "press_duration": float(dlg.result[1]), "wait_before": float(dlg.result[2])})
             self._refresh_list()
 
     def _add_click(self):
         dlg = _InputDialog(self, "Añadir Click", "Botón (left/right/middle):", "left", "X:", "500", "Y:", "300")
+        self.wait_window(dlg)
         if dlg.result:
             self.actions.append({"action": "click", "button": dlg.result[0], "x": int(dlg.result[1]), "y": int(dlg.result[2]), "press_duration": 0.05, "wait_before": 0.5})
             self._refresh_list()
@@ -266,6 +288,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
     def _add_wait(self):
         """Añade una pausa al inicio o final de la macro."""
         dlg = _WaitDialog(self)
+        self.wait_window(dlg)
         if dlg.result:
             seconds, position = dlg.result
             action = {"action": "press", "key": "__wait__", "press_duration": 0, "wait_before": seconds}
@@ -302,6 +325,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         if act["action"] == "press" and act["key"] == "__wait__":
             # Es una espera
             dlg = _SimpleInput(self, "Editar Espera", "Segundos:", str(act.get("wait_before", 0.5)))
+            self.wait_window(dlg)
             if dlg.result:
                 act["wait_before"] = float(dlg.result)
                 self._refresh_list()
