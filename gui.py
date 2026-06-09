@@ -1320,9 +1320,8 @@ class OrchestratorApp:
             if item.get("type") == "macro":
                 menu.add_command(label="🎬 Editar macro",
                                command=lambda i=idx: self._edit_macro(i))
-            else:
-                menu.add_command(label="⚙️ Condiciones",
-                               command=lambda i=idx: self._edit_conditions(i))
+            menu.add_command(label="⚙️ Condiciones",
+                           command=lambda i=idx: self._edit_conditions(i))
             menu.add_separator()
             menu.add_command(label="📁 Agrupar seleccionados",
                            command=self._group_selected)
