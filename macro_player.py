@@ -195,7 +195,7 @@ def events_to_actions(events):
         wait = round(ev["time"] - prev_time, 4)
 
         if ev["type"] == "key_press":
-            # Buscar el release correspondiente
+            # Buscar el release correspondiente (incluso si hay otras teclas en medio)
             press_ev = ev
             release_time = ev["time"]
             j = i + 1
@@ -204,10 +204,6 @@ def events_to_actions(events):
                 if nxt["type"] == "key_release" and nxt["key"] == press_ev["key"]:
                     release_time = nxt["time"]
                     i = j  # Saltar hasta el release
-                    break
-                # Si hay otro evento intermedio del mismo tipo (otra key_press diferente),
-                # asumimos que este press no tuvo release explícito
-                if nxt["type"] == "key_press":
                     break
                 j += 1
 
@@ -292,6 +288,9 @@ def actions_to_events(actions):
         t += act.get("wait_before", 0)
 
         if act["action"] == "press":
+            if act.get("key") == "__wait__":
+                # Es una pausa — el wait_before ya se sumó arriba, no generar eventos
+                continue
             key = act["key"]
             events.append({"type": "key_press", "key": key, "time": round(t, 4)})
             t += act.get("press_duration", 0.05)

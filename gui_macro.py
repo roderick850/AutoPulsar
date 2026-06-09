@@ -344,24 +344,36 @@ class MacroEditorWindow(ctk.CTkToplevel):
             return
 
         for i, act in enumerate(self.actions):
+            # Fila de acción
             row = self._render_row(i, act)
-            row.pack(fill=tk.X, pady=1)
+            row.pack(fill=tk.X, pady=(2, 1))
             self._row_widgets.append(row)
+
+            # Sub-fila de espera (tiempo hasta la siguiente acción)
+            wait = self._next_wait(i)
+            if wait is not None and wait > 0:
+                wait_row = self._render_wait_row(i, wait)
+                wait_row.pack(fill=tk.X, pady=(0, 2))
 
         self._inner.update_idletasks()
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
 
+    def _next_wait(self, idx):
+        """Devuelve el wait_before de la siguiente acción (None si es la última)."""
+        if idx + 1 < len(self.actions):
+            return self.actions[idx + 1].get("wait_before", 0)
+        return None
+
     def _render_row(self, idx, act):
         row = ttk.Frame(self._inner, style="Surface.TFrame")
 
-        # ── Etiqueta del índice + tiempo acumulado ──
+        # ── Índice + tiempo acumulado ──
         cum_time = self._cumulative_time(idx)
         ttk.Label(row, text=f"#{idx+1}", style="Dim.TLabel", width=4).pack(side=tk.LEFT, padx=(4, 2))
         ttk.Label(row, text=format_s(cum_time), style="Dim.TLabel", width=7, anchor="e").pack(side=tk.LEFT, padx=(0, 4))
 
         # ── Keycap visual ──
         if act["action"] == "press" and act.get("key") == "__wait__":
-            # Espera
             wait = act.get("wait_before", 0.5)
             cap = tk.Canvas(row, width=50, height=36, bg=C["surface"], highlightthickness=0, bd=0)
             cap.create_rectangle(2, 2, 48, 34, fill="#3a3a2a", outline="#5a5a3a", width=1, tags="key")
@@ -371,7 +383,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
             ttk.Label(row, text="Espera", style="Compact.TLabel", anchor="w", width=14).pack(side=tk.LEFT, padx=4)
 
             wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="s:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
+            ttk.Label(row, text=format_s(wait), style="Dim.TLabel", width=7).pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
@@ -381,26 +393,17 @@ class MacroEditorWindow(ctk.CTkToplevel):
             disp = key_display(key)
 
             cap = tk.Canvas(row, width=48, height=36, bg=C["surface"], highlightthickness=0, bd=0)
-            x1, y1, x2, y2 = 3, 2, 45, 34
-            cap.create_rectangle(x1, y1, x2, y2, fill=bg, outline=fg, width=2, tags="key")
+            cap.create_rectangle(3, 2, 45, 34, fill=bg, outline=fg, width=2, tags="key")
             cap.create_text(24, 18, text=disp, font=("Segoe UI", 11, "bold"), fill=fg, tags="key")
             cap.pack(side=tk.LEFT, padx=2)
 
             ttk.Label(row, text="Presionar", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
 
-            # Duración de presión
             dur = act.get("press_duration", 0.15)
             dur_var = tk.StringVar(value=str(dur))
             ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
-
-            # Espera antes del siguiente
-            wait = act.get("wait_before", 0.5)
-            wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         elif act["action"] == "click":
             btn = act.get("button", "left")
@@ -408,28 +411,17 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
             cap = tk.Canvas(row, width=48, height=36, bg=C["surface"], highlightthickness=0, bd=0)
             cap.create_oval(14, 8, 34, 28, fill=bg, outline=fg, width=2)
-            if btn == "right":
-                cap.create_text(24, 18, text="R", font=("Segoe UI", 9, "bold"), fill=fg)
-            else:
-                cap.create_text(24, 18, text="🖱", font=("Segoe UI", 12), fill=fg)
+            cap.create_text(24, 18, text="R" if btn == "right" else "🖱", font=("Segoe UI", 9 if btn == "right" else 12, "bold" if btn == "right" else "normal"), fill=fg)
             cap.pack(side=tk.LEFT, padx=2)
 
             ttk.Label(row, text=f"Click {btn}", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
             ttk.Label(row, text=f"({act.get('x',0)},{act.get('y',0)})", style="Dim.TLabel", width=12).pack(side=tk.LEFT)
 
-            # Duración de presión del click
             dur = act.get("press_duration", 0.05)
             dur_var = tk.StringVar(value=str(dur))
             ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
             ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
             ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
-
-            # Espera antes del siguiente
-            wait = act.get("wait_before", 0.5)
-            wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text="Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         # Botones de reorden y acción
         ttk.Button(row, text="⬆", width=2, command=lambda i=idx: self._move_up(i)).pack(side=tk.RIGHT, padx=1)
@@ -438,6 +430,23 @@ class MacroEditorWindow(ctk.CTkToplevel):
         ttk.Button(row, text="🗑", width=2, command=lambda i=idx: self._remove_action(i)).pack(side=tk.RIGHT, padx=1)
 
         return row
+
+    def _render_wait_row(self, idx, wait):
+        """Sub-fila indentada mostrando la espera hasta la siguiente acción."""
+        sub = ttk.Frame(self._inner, style="Surface.TFrame")
+
+        # Espaciado para alinear con la acción de arriba
+        ttk.Label(sub, text="", width=13).pack(side=tk.LEFT)  # compensa #N + tiempo
+        ttk.Label(sub, text="   ⏳  Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(2, 4))
+        ttk.Label(sub, text=format_s(wait), style="Dim.TLabel", width=7).pack(side=tk.LEFT)
+
+        wait_var = tk.StringVar(value=str(wait))
+        ttk.Entry(sub, textvariable=wait_var, width=6).pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Button(sub, text="✓", width=2,
+                   command=lambda v=wait_var, i=idx+1: self._update_attr(i, "wait_before", float(v.get()))
+                   ).pack(side=tk.LEFT, padx=1)
+
+        return sub
 
     def _update_attr(self, idx, attr, value):
         """Actualiza un atributo de una acción y refresca la lista."""
