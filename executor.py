@@ -201,6 +201,10 @@ class Executor(threading.Thread):
                     if condition_already_met:
                         self._safe_callback(
                             "on_repeat_until_done", idx, name, 0)
+                        if first_match_mode:
+                            # En first_match, no detener todo — solo
+                            # saltar este ítem y probar el siguiente
+                            continue
                         self.stop_event.set()
                         break
 
@@ -266,6 +270,9 @@ class Executor(threading.Thread):
                             self._safe_callback(
                                 "on_repeat_until_done",
                                 idx, name, iteration)
+                            if first_match_mode:
+                                # En first_match: item cumplió → volver a evaluar
+                                break
                             self.stop_event.set()
                             break
 
