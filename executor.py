@@ -114,9 +114,12 @@ class Executor(threading.Thread):
         loop_mode = self.settings.get("loop_mode", "once")
         loop_count = self.settings.get("loop_count", 1)
         loop_delay = self.settings.get("loop_delay", 0)
-        first_match_mode = (loop_mode == "first_match")
 
-        if loop_mode == "infinite" or loop_mode == "first_match":
+        if loop_mode == "first_match":
+            self._run_first_match()
+            return
+
+        if loop_mode == "infinite":
             max_loops = None
         elif loop_mode == "fixed":
             max_loops = loop_count
@@ -201,10 +204,6 @@ class Executor(threading.Thread):
                     if condition_already_met:
                         self._safe_callback(
                             "on_repeat_until_done", idx, name, 0)
-                        if first_match_mode:
-                            # En first_match, no detener todo — solo
-                            # saltar este ítem y probar el siguiente
-                            continue
                         self.stop_event.set()
                         break
 
@@ -270,9 +269,6 @@ class Executor(threading.Thread):
                             self._safe_callback(
                                 "on_repeat_until_done",
                                 idx, name, iteration)
-                            if first_match_mode:
-                                # En first_match: item cumplió → volver a evaluar
-                                break
                             self.stop_event.set()
                             break
 
@@ -347,10 +343,6 @@ class Executor(threading.Thread):
 
                         if self.stop_event.is_set():
                             break
-
-            # ── Modo first_match: ejecutó un ítem → volver a evaluar ──
-            if first_match_mode and not self.stop_event.is_set():
-                break
 
             # Delay entre loops
             if ((max_loops is None or current_loop < max_loops)
@@ -477,6 +469,106 @@ class Executor(threading.Thread):
         self._safe_callback('on_launch', f"Macro: {macro_data.get('name', 'sin nombre')}")
         player = MacroPlayer(events, external_stop=self.stop_event)
         player.play(block=True)
+
+    def _run_first_match(self):
+        """Modo first_match: ejecuta SOLO el primer ítem cuyas condiciones
+        se cumplan, luego re-evalúa con una nueva captura de pantalla.
+
+        Bucle infinito hasta que el usuario presione F10 (stop_event)."""
+        time.sleep(1)
+
+        total_reps_per_loop = sum(
+            item.get("repetitions", 1) for item in self.playlist)
+        completed_reps_total = 0
+        loop_num = 0
+
+        self._safe_callback("on_start_run", None,
+                            total_reps_per_loop, None)
+
+        while not self.stop_event.is_set():
+            loop_num += 1
+            self._safe_callback("on_start_loop", loop_num, None, None)
+
+            # ── Capturar pantalla UNA vez para todas las condiciones ──
+            screenshots = None
+            if HAS_ICON_DETECTOR:
+                try:
+                    screenshots = capture_all_screens()
+                except Exception:
+                    screenshots = None
+
+            matched = False
+            for idx, item in enumerate(self.playlist):
+                if self.stop_event.is_set():
+                    break
+                if not item.get("enabled", True):
+                    continue
+
+                name = os.path.basename(item.get("path", "?"))
+                reps = item.get("repetitions", 1)
+                duration = item.get("duration", 1)
+                pause = item.get("pause", 0)
+
+                conditions, is_repeat_until = _normalize_conditions(item)
+                has_conditions = bool(conditions.get("items"))
+
+                if has_conditions:
+                    # Verificar condiciones contra la captura (o captura fresca)
+                    ok = self._check_conditions_with_retry(
+                        conditions, idx, item, screenshots)
+                    if not ok:
+                        continue  # condición no cumplida → siguiente ítem
+
+                # ── ¡Match! Ejecutar este ítem ──
+                matched = True
+                self._safe_callback("on_start_item", idx, name, reps, "⚙️" if has_conditions else "")
+
+                for r in range(reps):
+                    if self.stop_event.is_set():
+                        break
+
+                    self._safe_callback(
+                        "on_repeat", completed_reps_total + 1,
+                        None, total_reps_per_loop,
+                        name, r + 1, reps, loop_num, None)
+
+                    try:
+                        self._launch_item(item)
+                    except Exception as e:
+                        self._safe_callback("on_error", str(e))
+                        break
+
+                    completed_reps_total += 1
+
+                    if item.get("type") != "macro":
+                        slept = 0.0
+                        while slept < duration and not self.stop_event.is_set():
+                            time.sleep(0.1)
+                            slept += 0.1
+
+                    if self.stop_event.is_set():
+                        break
+
+                    if r < reps - 1 and pause > 0:
+                        slept = 0.0
+                        while slept < pause and not self.stop_event.is_set():
+                            time.sleep(0.1)
+                            slept += 0.1
+
+                    if self.stop_event.is_set():
+                        break
+
+                break  # solo UN ítem por iteración → volver a evaluar
+
+            if not matched and not self.stop_event.is_set():
+                # Ningún ítem coincidió — breve pausa y reintentar
+                time.sleep(0.5)
+
+        self._safe_callback(
+            "on_finish",
+            "Detenido" if self.stop_event.is_set() else "Completado",
+            completed_reps_total, None, total_reps_per_loop,
+            loop_num, None)
 
     def _safe_callback(self, name, *args):
         cb = self.callbacks.get(name)
