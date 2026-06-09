@@ -444,8 +444,8 @@ class Executor(threading.Thread):
         actions = macro_data.get("actions", [])
         events = actions_to_events(actions)
 
-        self._safe_callback("on_launch", f"Macro: {macro_data.get('name', 'sin nombre')}")
-        player = MacroPlayer(events)
+        self._safe_callback('on_launch', f"Macro: {macro_data.get('name', 'sin nombre')}")
+        player = MacroPlayer(events, external_stop=self.stop_event)
         player.play(block=True)
 
     def _safe_callback(self, name, *args):

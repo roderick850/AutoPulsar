@@ -58,14 +58,16 @@ KEY_MAP = {
 class MacroPlayer:
     """Reproduce una secuencia de eventos macro."""
 
-    def __init__(self, events, callbacks=None):
+    def __init__(self, events, callbacks=None, external_stop=None):
         """
         events: lista de eventos (formato MacroRecorder)
         callbacks: {"on_start": fn, "on_event": fn(idx, event), "on_finish": fn, "on_stop": fn}
+        external_stop: threading.Event() externo para detener desde fuera
         """
         self.events = events
         self.callbacks = callbacks or {}
         self._stop_event = threading.Event()
+        self._external_stop = external_stop
         self._thread = None
 
     def play(self, block=False):
@@ -105,11 +107,19 @@ class MacroPlayer:
         if fn:
             fn(*args)
 
+    def _is_stopped(self):
+        """True si se debe detener (por stop interno o externo)."""
+        if self._stop_event.is_set():
+            return True
+        if self._external_stop and self._external_stop.is_set():
+            return True
+        return False
+
     def _execute(self):
         try:
             prev_time = 0.0
             for i, ev in enumerate(self.events):
-                if self._stop_event.is_set():
+                if self._is_stopped():
                     break
 
                 # Esperar el tiempo real entre eventos (como se grabó)
@@ -117,11 +127,11 @@ class MacroPlayer:
                 if wait > 0:
                     slept = 0.0
                     step = 0.01  # dormir en micro-pasos para poder cancelar
-                    while slept < wait and not self._stop_event.is_set():
+                    while slept < wait and not self._is_stopped():
                         time.sleep(min(step, wait - slept))
                         slept += step
 
-                if self._stop_event.is_set():
+                if self._is_stopped():
                     break
 
                 self._callback("on_event", i, ev)
