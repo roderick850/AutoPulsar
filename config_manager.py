@@ -123,13 +123,53 @@ def load_config(profile_name=None):
 
 
 def save_config(data, profile_name=None):
-    """Save playlist + settings for the given profile (or active if None)."""
+    """Save playlist + settings for the given profile (or active if None).
+
+    Uses atomic write: data is written to a temp file first, then
+    atomically replaces the target.  A backup copy (``.bak``) is
+    kept from the previous successful save so that a crash or disk-
+    full situation never leaves the profile file empty or truncated.
+    """
     if profile_name is None:
         profile_name = get_active_profile_name()
 
     path = _profile_path(profile_name)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    dirname = os.path.dirname(path)
+
+    # ── Temp file in the same directory (guarantees same filesystem → atomic rename) ──
+    tmp_path = path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())          # force data to disk
+    except Exception:
+        # Clean up partial temp file if write failed
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+    # ── Keep a backup of the previous good save ──
+    if os.path.exists(path):
+        bak_path = path + ".bak"
+        try:
+            os.replace(path, bak_path)
+        except OSError:
+            pass  # non-critical — we still have the temp file
+
+    # ── Atomic rename (temp → real) ──
+    try:
+        os.replace(tmp_path, path)
+    except OSError:
+        # If rename fails, try to restore from backup
+        if os.path.exists(path + ".bak"):
+            try:
+                os.replace(path + ".bak", path)
+            except OSError:
+                pass
+        raise
 
 
 def delete_profile(name):

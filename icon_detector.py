@@ -384,6 +384,114 @@ def diagnose_icon(icon_path, region=None, threshold=0.08):
     }
 
 
+def check_icon_on_screenshot(screenshot, icon_path, threshold=0.08):
+    """Verifica si el icono está en una captura ya hecha (sin volver a capturar).
+
+    Args:
+        screenshot: PIL Image ya capturada
+        icon_path: ruta a la imagen .png del icono
+        threshold: 0.0-1.0, tolerancia
+
+    Returns:
+        (found, error_msg)
+    """
+    if not os.path.exists(icon_path):
+        return False, "missing"
+    try:
+        icon = Image.open(icon_path)
+    except Exception:
+        return False, "missing"
+    result = _find_subimage(screenshot, icon, threshold)
+    if result is not None:
+        return True, None
+    return False, "not_found"
+
+
+def check_conditions_on_screenshots(screenshots, conditions):
+    """Evalúa condiciones contra una lista de capturas ya hechas.
+
+    Igual lógica que check_conditions() pero sin volver a capturar
+    la pantalla — reutiliza las screenshots pasadas como argumento.
+
+    Args:
+        screenshots: lista de PIL Image (una por monitor)
+        conditions: dict con mode + items (ver check_conditions)
+
+    Returns:
+        (should_execute, reason)
+    """
+    items = conditions.get("items", [])
+    if not items:
+        return True, None
+
+    mode = conditions.get("mode", "and")
+    results = []
+    reasons = []
+
+    for cond in items:
+        icon_path = cond.get("icon_path", "")
+        ctype = cond.get("type", "require")
+
+        if not icon_path:
+            passed = True if ctype == "block" else False
+            results.append(passed)
+            if not passed:
+                reasons.append("Requiere icono (sin ruta)")
+            continue
+
+        # Buscar en todas las screenshots hasta encontrar (o no)
+        found = False
+        for screenshot in screenshots:
+            f, _ = check_icon_on_screenshot(
+                screenshot, icon_path,
+                threshold=cond.get("threshold", 0.08))
+            if f:
+                found = True
+                break
+
+        if ctype == "require":
+            results.append(found)
+            if not found:
+                tag = "falta icono" if not os.path.exists(icon_path) else "icono no visible"
+                reasons.append(f"Requerir: {tag} ({os.path.basename(icon_path)})")
+        elif ctype == "block":
+            blocked = not found
+            results.append(blocked)
+            if not blocked:
+                reasons.append(f"Bloquear: icono visible ({os.path.basename(icon_path)})")
+        else:
+            results.append(found)
+
+    if mode == "or":
+        passed = any(results)
+    else:
+        passed = all(results)
+
+    if passed:
+        return True, None
+    else:
+        return False, "; ".join(reasons) if reasons else "condiciones no cumplidas"
+
+
+def capture_all_screens():
+    """Captura todos los monitores y retorna una lista de PIL Image.
+
+    Returns:
+        list[PIL.Image]: una imagen por monitor
+    """
+    if HAS_MSS:
+        with mss.mss() as sct:
+            screenshots = []
+            for monitor in sct.monitors[1:]:
+                screenshot = sct.grab(monitor)
+                screenshots.append(Image.frombytes(
+                    "RGB", screenshot.size, screenshot.bgra, "raw", "BGRX"))
+            return screenshots
+    else:
+        from PIL import ImageGrab
+        return [ImageGrab.grab(all_screens=True)]
+
+
 # ── Prueba rápida ──
 if __name__ == "__main__":
     import sys

@@ -98,6 +98,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self.minsize(700, 400)
         self.transient(parent)
         self.grab_set()
+        self._center_on(parent)
 
         self.on_save = on_save
         self.actions = initial_actions or []
@@ -491,6 +492,20 @@ class MacroEditorWindow(ctk.CTkToplevel):
         if self.on_save:
             self.on_save(macro_data)
         self.destroy()
+
+    def _center_on(self, parent):
+        """Centra esta ventana sobre la ventana padre, manejando multi-monitor."""
+        self.update_idletasks()
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        px, py = parent.winfo_x(), parent.winfo_y()
+        dw, dh = self.winfo_width(), self.winfo_height()
+        # Fallback si la ventana padre aún no tiene dimensiones reales
+        if pw < 100 or ph < 100:
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry(f"+{(sw - dw)//2}+{(sh - dh)//2}")
+        else:
+            self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
 
 
 # ── Diálogos auxiliares ──────────────────────────────────

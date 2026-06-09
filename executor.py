@@ -6,6 +6,7 @@ import itertools
 
 try:
     from icon_detector import check_conditions, check_icon, check_icon_multi
+    from icon_detector import capture_all_screens, check_conditions_on_screenshots
     HAS_ICON_DETECTOR = True
 except ImportError:
     HAS_ICON_DETECTOR = False
@@ -153,6 +154,16 @@ class Executor(threading.Thread):
             self._safe_callback("on_start_loop", current_loop,
                                 max_loops, total_global_reps)
 
+            # ── Snapshot único: capturar todos los monitores una sola vez ──
+            #    y reutilizar para TODOS los ítems con condiciones del loop.
+            #    Esto evita N capturas para N ítems con condiciones.
+            loop_screenshots = None
+            if HAS_ICON_DETECTOR:
+                try:
+                    loop_screenshots = capture_all_screens()
+                except Exception:
+                    loop_screenshots = None  # fallback: cada ítem captura por su cuenta
+
             for idx, item in enumerate(self.playlist):
                 if self.stop_event.is_set():
                     break
@@ -269,7 +280,7 @@ class Executor(threading.Thread):
                     first_ok = True
                     if has_conditions:
                         first_ok = self._check_conditions_with_retry(
-                            conditions, idx, item)
+                            conditions, idx, item, loop_screenshots)
 
                     if not first_ok:
                         continue  # skip ya mostrado, pasar al siguiente ítem
@@ -284,7 +295,7 @@ class Executor(threading.Thread):
                         # Re-verificar para reps > 1
                         if r > 0 and has_conditions:
                             ok = self._check_conditions_with_retry(
-                                conditions, idx, item)
+                                conditions, idx, item, loop_screenshots)
                             if not ok:
                                 break
 
@@ -367,8 +378,12 @@ class Executor(threading.Thread):
                     "El hilo principal no pudo lanzar el .exe")
             time.sleep(2.0)
 
-    def _check_conditions_with_retry(self, conditions, idx, item):
-        """Verifica condiciones con reintentos + fallback."""
+    def _check_conditions_with_retry(self, conditions, idx, item, screenshots=None):
+        """Verifica condiciones con reintentos + fallback.
+
+        Si screenshots es provisto, reutiliza esas capturas en vez de
+        tomar nuevas — evita N capturas para N ítems.
+        """
         retry_cfg = conditions.get("retry", {})
         retry_enabled = retry_cfg.get("enabled", False)
         retry_count = retry_cfg.get("count", 1) if retry_enabled else 1
@@ -378,7 +393,10 @@ class Executor(threading.Thread):
         for attempt in range(retry_count):
             if self.stop_event.is_set():
                 return False
-            ok, reason = check_conditions(conditions)
+            if screenshots is not None:
+                ok, reason = check_conditions_on_screenshots(screenshots, conditions)
+            else:
+                ok, reason = check_conditions(conditions)
             if ok:
                 cond_met = True
                 break
