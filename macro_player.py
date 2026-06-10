@@ -144,6 +144,16 @@ class MacroPlayer:
         except Exception as e:
             self._callback("on_error", str(e))
 
+    def _human_move(self, x, y):
+        """Mueve el mouse a (x,y) con movimiento fluido proporcional a la distancia."""
+        cur_x, cur_y = pyautogui.position()
+        dx, dy = x - cur_x, y - cur_y
+        distance = (dx * dx + dy * dy) ** 0.5
+        # Duración proporcional: mínimo 0.12s, máximo 0.8s
+        # ~2500px = diagonal de un monitor 1080p → 0.8s
+        duration = max(0.12, min(0.8, distance / 3125))
+        pyautogui.moveTo(x, y, duration=duration, tween=pyautogui.easeOutQuad)
+
     def _play_event(self, ev):
         t = ev["type"]
 
@@ -163,15 +173,13 @@ class MacroPlayer:
 
         elif t == "mouse_move":
             x, y = ev.get("x", 0), ev.get("y", 0)
-            # Movimiento rápido y fluido con easing
-            pyautogui.moveTo(x, y, duration=0.03, tween=pyautogui.easeOutQuad)
+            self._human_move(x, y)
 
         elif t == "mouse_click":
             btn = ev.get("button", "left")
             x, y = ev.get("x"), ev.get("y")
             if btn in ("left", "right", "middle"):
-                # Mover primero al punto del click (fluido)
-                pyautogui.moveTo(x, y, duration=0.03, tween=pyautogui.easeOutQuad)
+                self._human_move(x, y)
                 pyautogui.mouseDown(button=btn)
 
         elif t == "mouse_release":
