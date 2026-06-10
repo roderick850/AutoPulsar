@@ -465,7 +465,11 @@
   <p>Si las condiciones no se cumplen, puedes configurar reintentos automáticos cada N segundos.</p>
 
   <h3>🆘 Script de recuperación</h3>
-  <p>Si un script falla X veces seguidas, ejecuta un script alternativo (ej: reiniciar el juego, volver al menú).</p>
+  <p>Si un script falla X veces seguidas, ejecuta un script alternativo o una <strong>macro</strong> de la playlist (ej: reiniciar el juego, volver al menú).</p>
+  <ul>
+    <li><strong>Externo (.exe):</strong> lanza un ejecutable externo con <code>subprocess</code>.</li>
+    <li><strong>Macro:</strong> busca la macro por nombre en tu playlist y la reproduce con el motor de macros (clicks, teclas, delays).</li>
+  </ul>
 </section>
 
 <!-- ═══════════ 8. DIAGNÓSTICO ═══════════ -->
