@@ -8,7 +8,7 @@ Para lo que necesites: productividad, gaming, testing, tareas repetitivas, gesti
 
 ## 🚀 Descarga rápida
 
-👉 **[Descargar AutoPulsar.exe](https://github.com/roderick850/TinyTaskOrchestrator/releases/latest)** — ~11 MB, portable, no requiere instalación.
+👉 **[Descargar AutoPulsar.exe](https://github.com/roderick850/AutoPulsar/releases/latest)** — ~31 MB, portable, no requiere instalación.
 
 > 💡 Si Windows SmartScreen te bloquea, haz clic en **"Más información"** → **"Ejecutar de todas formas"**. El archivo es seguro, es un falso positivo porque no está firmado digitalmente.
 
@@ -25,13 +25,13 @@ Para lo que necesites: productividad, gaming, testing, tareas repetitivas, gesti
 
 ### Opción 1: Ejecutable compilado (recomendado)
 
-Descarga `AutoPulsar.exe` desde la sección de **[Releases](https://github.com/roderick850/TinyTaskOrchestrator/releases)**. Es portable — no necesita Python ni nada instalado. Solo descarga, ejecuta, y listo.
+Descarga `AutoPulsar.exe` desde la sección de **[Releases](https://github.com/roderick850/AutoPulsar/releases)**. Es portable — no necesita Python ni nada instalado. Solo descarga, ejecuta, y listo.
 
 ### Opción 2: Desde el código fuente
 
 ```bash
-git clone https://github.com/roderick850/TinyTaskOrchestrator.git
-cd TinyTaskOrchestrator
+git clone https://github.com/roderick850/AutoPulsar.git
+cd AutoPulsar
 pip install -r requirements.txt
 python main.py
 ```
