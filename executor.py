@@ -74,9 +74,14 @@ def _check_icon_with_threshold(cond):
 
 def _evaluate_items(items, mode):
     """Evalúa una lista de condiciones (require/block) con modo AND/OR.
-    Retorna (passed, reasons)."""
+    Retorna (passed, reasons). Solo evalúa condiciones habilitadas.
+    Si todas están deshabilitadas, retorna True (sin condiciones)."""
     reasons = []
+    any_enabled = False
     for cond in items:
+        if not cond.get("enabled", True):
+            continue
+        any_enabled = True
         ctype = cond.get("type", "require")
         found, err = _check_icon_with_threshold(cond)
         if ctype == "require":
@@ -88,6 +93,8 @@ def _evaluate_items(items, mode):
             return False, reasons
         if mode == "or" and ok:
             return True, reasons
+    if not any_enabled:
+        return True, reasons  # sin condiciones habilitadas → pasar
     if mode == "and":
         return True, reasons
     return False, reasons

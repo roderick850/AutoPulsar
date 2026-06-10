@@ -208,6 +208,8 @@ def check_conditions(conditions):
     Si no hay condiciones, retorna (True, None).
     """
     items = conditions.get("items", [])
+    # Filtrar solo condiciones habilitadas
+    items = [c for c in items if c.get("enabled", True)]
     if not items:
         return True, None
 
@@ -405,6 +407,8 @@ def check_conditions_on_screenshots(screenshots, conditions):
         (should_execute, reason)
     """
     items = conditions.get("items", [])
+    # Filtrar solo condiciones habilitadas
+    items = [c for c in items if c.get("enabled", True)]
     if not items:
         return True, None
 

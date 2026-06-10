@@ -1078,7 +1078,8 @@ class OrchestratorApp:
             check = "✅" if enabled else "❌"
             primero = "🔂" if item.get("first_loop_only", False) else ""
             icono = "🖼️" if item.get("icon_path", "") else ""
-            n_cond = len(item.get("conditions", {}).get("items", []))
+            conds = item.get("conditions", {}).get("items", [])
+            n_cond = sum(1 for c in conds if c.get("enabled", True))
             cond_text = f"⚙️{n_cond}" if n_cond else ""
             repeat_until_mark = "🔄" if item.get("repeat_until_enabled") and item.get("repeat_until_icon") else ""
 
@@ -1682,12 +1683,14 @@ class OrchestratorApp:
         list_frame = ttk.Frame(dlg)
         list_frame.pack(fill=tk.BOTH, expand=True, **pad)
 
-        columns = ("tipo", "label", "icono", "umbral")
+        columns = ("hab", "tipo", "label", "icono", "umbral")
         tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=6)
+        tree.heading("hab", text="✓")
         tree.heading("tipo", text="Tipo")
         tree.heading("label", text="Etiqueta")
         tree.heading("icono", text="Icono")
         tree.heading("umbral", text="Tolerancia")
+        tree.column("hab", width=28, anchor="center")
         tree.column("tipo", width=72, anchor="center")
         tree.column("label", width=140, anchor="w")
         tree.column("icono", width=100, anchor="center")
@@ -1705,7 +1708,9 @@ class OrchestratorApp:
                 ctype = cond.get("type", "require")
                 label = cond.get("label", "")
                 ipath = cond.get("icon_path", "")
-                tipo_display = "✅ Requerir" if ctype == "require" else "❌ Bloquear"
+                enabled = cond.get("enabled", True)
+                hab_display = "✅" if enabled else "❌"
+                tipo_display = "Requerir" if ctype == "require" else "Bloquear"
                 icon_display = os.path.basename(ipath) if ipath else "(sin icono)"
                 umbral = cond.get("threshold", 0.08)
                 samples = cond.get("samples", 1)
@@ -1715,9 +1720,23 @@ class OrchestratorApp:
                 else:
                     umbral_display = f"{umbral:.2f}"
                 tree.insert("", tk.END, iid=str(ci),
-                           values=(tipo_display, label, icon_display, umbral_display))
+                           values=(hab_display, tipo_display, label, icon_display, umbral_display))
 
         _refresh_cond_list()
+
+        # ── Click en columna ✓ para habilitar/deshabilitar ──
+        def _on_tree_click(event):
+            col = tree.identify_column(event.x)
+            item_id = tree.identify_row(event.y)
+            if not item_id or col != "#1":  # columna hab
+                return
+            i = int(item_id)
+            if 0 <= i < len(cond_copy["items"]):
+                current = cond_copy["items"][i].get("enabled", True)
+                cond_copy["items"][i]["enabled"] = not current
+                _refresh_cond_list()
+
+        tree.bind("<ButtonRelease-1>", _on_tree_click)
 
         # ── Botones de acción ──
         btn_frame = ttk.Frame(dlg)
@@ -1805,6 +1824,7 @@ class OrchestratorApp:
                         "samples": 1,
                         "confidence": 1.0,
                         "region": [search_x, search_y, search_w, search_h],
+                        "enabled": True,
                     })
                     _refresh_cond_list()
 
@@ -2128,6 +2148,13 @@ class OrchestratorApp:
                     "No hay condiciones para evaluar.", "info")
                 return
 
+            # Filtrar solo habilitadas
+            enabled_items = [c for c in items if c.get("enabled", True)]
+            if not enabled_items:
+                self._dark_dialog("Sin condiciones habilitadas",
+                    "Todas las condiciones están deshabilitadas.\nEl script se ejecutará sin restricciones.", "info")
+                return
+
             mode = cond_copy.get("mode", "and")
             action = cond_copy.get("action", "require")
 
@@ -2137,7 +2164,7 @@ class OrchestratorApp:
             dlg.update()
 
             results = []
-            for ci, cond in enumerate(items):
+            for ci, cond in enumerate(enabled_items):
                 ipath = cond.get("icon_path", "")
                 ctype = cond.get("type", "require")
                 threshold = cond.get("threshold", 0.08)
