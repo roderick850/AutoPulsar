@@ -34,7 +34,7 @@ def _get_app_dir():
             os.environ.get("APPDATA", os.path.expanduser("~")),
             "AutoPulsar",
         )
-        # ── Migration from TinyTaskOrchestrator ──
+        # ── Migration from old app name ──
         if not os.path.exists(app_data):
             old_dir = os.path.join(
                 os.environ.get("APPDATA", os.path.expanduser("~")),
