@@ -43,7 +43,7 @@ def _normalize_conditions(item):
             },
             "retry": {"enabled": False, "count": 3, "delay": 5},
             "fallback": {"enabled": False, "threshold": 3,
-                         "script": "", "delay_after": 0},
+                         "type": "exe", "script": "", "macro_name": "", "delay_after": 0},
         }
         return conditions, True
 
@@ -433,21 +433,28 @@ class Executor(threading.Thread):
             fallback_cfg = conditions.get("fallback", {})
             if fallback_cfg.get("enabled", False):
                 threshold = fallback_cfg.get("threshold", 3)
+                fb_type = fallback_cfg.get("type", "exe")
                 fallback_script = fallback_cfg.get("script", "")
-                if (item["_consecutive_failures"] >= threshold
-                        and fallback_script):
+                fallback_macro_name = fallback_cfg.get("macro_name", "")
+                has_fb = (fb_type == "exe" and fallback_script) or \
+                         (fb_type == "macro" and fallback_macro_name and fallback_macro_name != "(ninguna)")
+                if item["_consecutive_failures"] >= threshold and has_fb:
                     if not silent:
+                        fb_label = fallback_macro_name if fb_type == "macro" else os.path.basename(fallback_script)
                         self._safe_callback(
                             "on_fallback_trigger", idx,
                             os.path.basename(item["path"]),
-                            os.path.basename(fallback_script))
+                            fb_label)
                     try:
-                        subprocess.Popen(fallback_script, shell=True)
+                        if fb_type == "macro":
+                            self._play_fallback_macro(fallback_macro_name)
+                        else:
+                            subprocess.Popen(fallback_script, shell=True)
                     except Exception as e:
                         if not silent:
                             self._safe_callback(
                                 "on_fallback_error",
-                                os.path.basename(fallback_script),
+                                fallback_macro_name if fb_type == "macro" else os.path.basename(fallback_script),
                                 str(e))
                     item["_consecutive_failures"] = 0
 
@@ -484,6 +491,16 @@ class Executor(threading.Thread):
         self._safe_callback('on_launch', f"Macro: {macro_data.get('name', 'sin nombre')}")
         player = MacroPlayer(events, external_stop=self.stop_event)
         player.play(block=True)
+
+    def _play_fallback_macro(self, macro_name):
+        """Busca una macro por nombre en la playlist y la ejecuta como fallback."""
+        for pl_item in self.playlist:
+            if pl_item.get("type") == "macro":
+                md = pl_item.get("macro_data", {})
+                if md.get("name") == macro_name:
+                    self._play_macro(pl_item)
+                    return
+        raise ValueError(f"Macro no encontrada: {macro_name}")
 
     def _run_first_match(self):
         """Modo first_match: ejecuta SOLO el primer ítem cuyas condiciones

@@ -1569,7 +1569,7 @@ class OrchestratorApp:
                 "check_interval": 0.5,
             })),
             "retry": dict(conditions.get("retry", {"enabled": False, "count": 3, "delay": 5})),
-            "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "script": "", "delay_after": 0})),
+            "fallback": dict(conditions.get("fallback", {"enabled": False, "threshold": 3, "type": "exe", "script": "", "macro_name": "", "delay_after": 0})),
         }
 
         dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
@@ -2254,6 +2254,8 @@ class OrchestratorApp:
         fallback_threshold_var = tk.IntVar(value=cond_copy["fallback"]["threshold"])
         fallback_script_var = tk.StringVar(value=cond_copy["fallback"]["script"])
         fallback_delay_var = tk.IntVar(value=cond_copy["fallback"].get("delay_after", 0))
+        fallback_type_var = tk.StringVar(value=cond_copy["fallback"].get("type", "exe"))
+        fallback_macro_name = cond_copy["fallback"].get("macro_name", "")
 
         fb_row1 = ttk.Frame(fallback_frame)
         fb_row1.pack(fill=tk.X)
@@ -2263,10 +2265,19 @@ class OrchestratorApp:
                     textvariable=fallback_threshold_var).pack(side=tk.LEFT)
         ttk.Label(fb_row1, text="veces seguidas, ejecutar:").pack(side=tk.LEFT)
 
-        fb_row2 = ttk.Frame(fallback_frame)
-        fb_row2.pack(fill=tk.X, pady=(4, 0))
+        # ── Tipo: Exe o Macro ──
+        fb_type_row = ttk.Frame(fallback_frame)
+        fb_type_row.pack(fill=tk.X, pady=(4, 0))
+        ttk.Label(fb_type_row, text="Tipo:").pack(side=tk.LEFT)
+        ttk.Radiobutton(fb_type_row, text="Externo (.exe)", variable=fallback_type_var,
+                        value="exe", command=lambda: _toggle_fb_type()).pack(side=tk.LEFT, padx=(4, 8))
+        ttk.Radiobutton(fb_type_row, text="Macro", variable=fallback_type_var,
+                        value="macro", command=lambda: _toggle_fb_type()).pack(side=tk.LEFT)
 
-        fb_script_label = ttk.Label(fb_row2, textvariable=fallback_script_var,
+        # ── Selector de exe ──
+        fb_exe_row = ttk.Frame(fallback_frame)
+
+        fb_script_label = ttk.Label(fb_exe_row, textvariable=fallback_script_var,
                                     style="Dim.TLabel", width=45, anchor=tk.W)
         fb_script_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
@@ -2277,8 +2288,35 @@ class OrchestratorApp:
             if path:
                 fallback_script_var.set(path)
 
-        ttk.Button(fb_row2, text="📂 Elegir", command=_pick_fallback,
+        ttk.Button(fb_exe_row, text="📂 Elegir", command=_pick_fallback,
                    style="Compact.TButton").pack(side=tk.RIGHT, padx=(4, 0))
+
+        # ── Selector de macro ──
+        fb_macro_row = ttk.Frame(fallback_frame)
+        ttk.Label(fb_macro_row, text="Macro:").pack(side=tk.LEFT)
+
+        # Recopilar macros de la playlist
+        macro_names = ["(ninguna)"]
+        for pl_item in self.playlist:
+            if pl_item.get("type") == "macro":
+                md = pl_item.get("macro_data", {})
+                mn = md.get("name", "")
+                if mn:
+                    macro_names.append(mn)
+        fb_macro_combo_var = tk.StringVar(value=fallback_macro_name if fallback_macro_name in macro_names else "(ninguna)")
+        fb_macro_combo = ttk.Combobox(fb_macro_row, textvariable=fb_macro_combo_var,
+                                       values=macro_names, width=30, state="readonly")
+        fb_macro_combo.pack(side=tk.LEFT, padx=4)
+
+        def _toggle_fb_type():
+            if fallback_type_var.get() == "macro":
+                fb_exe_row.pack_forget()
+                fb_macro_row.pack(fill=tk.X, pady=(4, 0))
+            else:
+                fb_macro_row.pack_forget()
+                fb_exe_row.pack(fill=tk.X, pady=(4, 0))
+
+        _toggle_fb_type()  # estado inicial
 
         fb_row3 = ttk.Frame(fallback_frame)
         fb_row3.pack(fill=tk.X, pady=(4, 0))
@@ -2307,7 +2345,9 @@ class OrchestratorApp:
             cond_copy["fallback"] = {
                 "enabled": fallback_enabled_var.get(),
                 "threshold": fallback_threshold_var.get(),
+                "type": fallback_type_var.get(),
                 "script": fallback_script_var.get(),
+                "macro_name": fb_macro_combo_var.get() if fallback_type_var.get() == "macro" else "",
                 "delay_after": fallback_delay_var.get(),
             }
             item["conditions"] = {
