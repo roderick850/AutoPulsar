@@ -607,28 +607,37 @@ class OrchestratorApp:
         except tk.TclError:
             pass
 
-        # ── Treeview (ttk — no hay CTk equivalente) ──
+        # ── Treeview (ttk — optimizado para lectura) ──
         style.configure("Treeview",
-                        background=c["surface_alt"], foreground=c["text"],
-                        fieldbackground=c["surface_alt"], borderwidth=0,
-                        rowheight=22)
+                        background=c["surface_alt"],
+                        foreground=c["text"],
+                        fieldbackground=c["surface_alt"],
+                        borderwidth=0,
+                        rowheight=24)
         style.configure("Treeview.Heading",
-                        background=c["surface"], foreground=c["text"],
-                        borderwidth=1, bordercolor=c["border"], padding=4,
-                        font=("Segoe UI", 9, "bold"))
+                        background=c["surface"],
+                        foreground=c["text_dim"],
+                        borderwidth=0,
+                        relief="flat",
+                        padding=(8, 4),
+                        font=("Segoe UI", 8, "bold"))
         style.map("Treeview.Heading",
-                  background=[("active", c["accent"])],
-                  foreground=[("active", "#ffffff")])
+                  background=[("active", c["surface_alt"])],
+                  foreground=[("active", c["text"])])
         style.map("Treeview",
                   background=[("selected", c["accent"])],
                   foreground=[("selected", "#ffffff")])
 
-        # ── Scrollbar (ttk) ──
-        style.configure("TScrollbar", background=c["surface"],
-                        troughcolor=c["bg"], bordercolor=c["bg"],
-                        arrowcolor=c["text_dim"], borderwidth=0)
+        # ── Scrollbar (ttk — estilizado moderno, sin flechas) ──
+        style.configure("TScrollbar",
+                        background=c["surface_alt"],
+                        troughcolor=c["surface"],
+                        bordercolor=c["bg"],
+                        arrowcolor=c["surface_alt"],
+                        relief="flat", borderwidth=0, arrowsize=14)
         style.map("TScrollbar",
-                  background=[("active", c["surface_alt"])])
+                  background=[("active", c["border"])],
+                  arrowcolor=[("active", c["text_dim"])])
 
         # ── Separator ──
         style.configure("TSeparator", background=c["border"])
@@ -639,16 +648,26 @@ class OrchestratorApp:
         style.configure("TLabelframe.Label", background=c["bg"], foreground=c["text"],
                         font=("Segoe UI", 9, "bold"))
 
-        # ── Combobox / Spinbox (ttk — no hay CTk equivalente) ──
-        style.configure("TCombobox", fieldbackground=c["surface_alt"],
-                        foreground=c["text"], background=c["surface_alt"],
-                        arrowcolor=c["text"], bordercolor=c["border"])
+        # ── Combobox / Spinbox (ttk — estilizado moderno) ──
+        style.configure("TCombobox",
+                        fieldbackground=c["surface_alt"],
+                        foreground=c["text"],
+                        background=c["surface_alt"],
+                        arrowcolor=c["text_dim"],
+                        bordercolor=c["border"],
+                        borderwidth=1, relief="solid",
+                        padding=(10, 4))
         style.map("TCombobox",
                   fieldbackground=[("readonly", c["surface_alt"]),
-                                  ("focus", c["surface"]),
-                                  ("active", c["surface"])],
+                                  ("focus", c["surface_alt"]),
+                                  ("active", c["surface_alt"])],
                   foreground=[("readonly", c["text"]),
+                             ("focus", c["text"]),
+                             ("active", c["text"])],
+                  arrowcolor=[("active", c["text"]),
                              ("focus", c["text"])],
+                  bordercolor=[("focus", c["accent"]),
+                              ("active", c["accent"])],
                   selectbackground=[("readonly", c["accent"])],
                   selectforeground=[("readonly", "#ffffff")])
         self.root.option_add("*TCombobox*Listbox.background", c["surface_alt"])
@@ -656,15 +675,25 @@ class OrchestratorApp:
         self.root.option_add("*TCombobox*Listbox.selectBackground", c["accent"])
         self.root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
         self.root.option_add("*TCombobox*Listbox.font", ("Segoe UI", 9))
-        style.configure("TSpinbox", fieldbackground=c["surface_alt"],
-                        foreground=c["text"], bordercolor=c["border"],
-                        borderwidth=1, arrowcolor=c["text"],
-                        background=c["surface_alt"])
+        style.configure("TSpinbox",
+                        fieldbackground=c["surface_alt"],
+                        foreground=c["text"],
+                        bordercolor=c["border"],
+                        borderwidth=1, relief="solid",
+                        arrowcolor=c["text_dim"],
+                        background=c["surface_alt"],
+                        padding=(6, 3))
         style.map("TSpinbox",
                   fieldbackground=[("disabled", c["surface_alt"]),
                                   ("readonly", c["surface_alt"])],
                   foreground=[("disabled", c["text_dim"]),
-                             ("readonly", c["text"])],
+                             ("readonly", c["text"]),
+                             ("focus", c["text"]),
+                             ("active", c["text"])],
+                  bordercolor=[("focus", c["accent"]),
+                              ("active", c["accent"])],
+                  arrowcolor=[("active", c["text"]),
+                             ("focus", c["text"])],
                   background=[("disabled", c["surface_alt"]),
                              ("readonly", c["surface_alt"])])
 
