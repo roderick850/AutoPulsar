@@ -45,25 +45,25 @@ def format_time(seconds):
     return f"{s}s"
 
 
-# ── Dark Theme Colors (synced with CTk "dark-blue" palette) ──────
+# ── Dark Theme Colors — Vercel Sleek (violet accent) ──────
 DARK_COLORS = {
-    "bg":           "#0d0d0d",   # main window bg — deep black
-    "surface":      "#1a1a1a",   # CTkFrame fg_color
-    "surface_alt":  "#212121",   # Treeview row bg
-    "border":       "#3a3a3a",   # subtle borders
-    "text":         "#e0e0e0",   # primary text
-    "text_dim":     "#808080",   # secondary text
-    "accent":       "#1f538d",   # CTkButton blue
-    "accent_hover": "#14375e",   # button hover
-    "green":        "#2e8b57",   # success / ready
-    "green_dim":    "#1e6b3e",   # darker green
-    "red":          "#c44545",   # stop / error
-    "yellow":       "#c4a43d",   # warning
-    "blue":         "#3a7ebf",   # running
-    "purple":       "#7c5cbf",   # waiting
-    "menu_bg":      "#0d0d0d",   # menu bar background
-    "menu_fg":      "#e0e0e0",   # menu bar text
-    "menu_active":  "#2a2a2a",   # menu hover
+    "bg":           "#0a0a0a",   # main window bg — true black
+    "surface":      "#141414",   # CTkFrame fg_color
+    "surface_alt":  "#1a1a1a",   # Treeview row bg
+    "border":       "#2a2a2a",   # subtle borders
+    "text":         "#fafafa",   # primary text — crisp white
+    "text_dim":     "#888888",   # secondary text
+    "accent":       "#8b5cf6",   # violet accent (Vercel-style)
+    "accent_hover": "#9d74f7",   # lighter violet hover
+    "green":        "#10b981",   # success / ready — emerald
+    "green_dim":    "#059669",   # darker emerald
+    "red":          "#ef4444",   # stop / error — modern red
+    "yellow":       "#f59e0b",   # warning — amber
+    "blue":         "#3b82f6",   # running — modern blue
+    "purple":       "#8b5cf6",   # waiting / highlight — violet
+    "menu_bg":      "#0a0a0a",   # menu bar background
+    "menu_fg":      "#fafafa",   # menu bar text
+    "menu_active":  "#1a1a1a",   # menu hover
 }
 
 
@@ -232,7 +232,7 @@ class OrchestratorApp:
             command=self._toggle_mini_bar,
             selectcolor=c["surface_alt"])
         view_menu.add_separator(background=c["border"])
-        view_menu.add_command(label="🗟️ Restaurar tamaño", command=self._menu_reset_size)
+        view_menu.add_command(label="◳ Restaurar tamaño", command=self._menu_reset_size)
         view_mb.config(menu=view_menu)
 
         # Ayuda
@@ -565,16 +565,19 @@ class OrchestratorApp:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
 
-        # ── CustomTkinter global widget defaults ──
-        # CTk usa su propio tema; solo ajustamos corner_radius global
+        # ── CustomTkinter global widget defaults (Vercel Sleek) ──
         try:
-            # Aplicar corner_radius default a todos los CTkFrames
             from customtkinter import ThemeManager
-            ThemeManager.theme["CTkFrame"]["corner_radius"] = 6
-            ThemeManager.theme["CTkButton"]["corner_radius"] = 6
-            ThemeManager.theme["CTkEntry"]["corner_radius"] = 4
+            ThemeManager.theme["CTkFrame"]["corner_radius"] = 8
+            ThemeManager.theme["CTkButton"]["corner_radius"] = 8
+            ThemeManager.theme["CTkEntry"]["corner_radius"] = 6
             ThemeManager.theme["CTkButton"]["border_width"] = 1
-            ThemeManager.theme["CTkButton"]["border_color"] = ["#3a7ebf80", "#1f538d80"]
+            ThemeManager.theme["CTkButton"]["border_color"] = ["#3a3a3a", "#2a2a2a"]
+            ThemeManager.theme["CTkButton"]["fg_color"] = ["#1a1a1a", "#141414"]
+            ThemeManager.theme["CTkButton"]["hover_color"] = ["#2a2a2a", "#1a1a1a"]
+            ThemeManager.theme["CTkButton"]["text_color"] = "#fafafa"
+            ThemeManager.theme["CTkButton"]["font"] = ("Segoe UI", 9)
+            ThemeManager.theme["CTkButton"]["height"] = 28
         except Exception:
             pass
 
@@ -721,7 +724,7 @@ class OrchestratorApp:
                    command=self._new_profile).pack(side=tk.LEFT, padx=(6, 1))
         ttk.Button(profile_frame, text="✎", width=2, style="Compact.TButton",
                    command=self._rename_profile).pack(side=tk.LEFT, padx=1)
-        ttk.Button(profile_frame, text="🗑", width=2, style="Compact.TButton",
+        ttk.Button(profile_frame, text="✕", width=2, style="Compact.TButton",
                    command=self._delete_profile).pack(side=tk.LEFT, padx=1)
         ttk.Button(profile_frame, text="⧉", width=2, style="Compact.TButton",
                    command=self._clone_profile).pack(side=tk.LEFT, padx=1)
@@ -818,25 +821,25 @@ class OrchestratorApp:
         btn_frame = ttk.Frame(self.root)
         btn_frame.pack(fill=tk.X, padx=5, pady=(0, 3))
 
-        ttk.Button(btn_frame, text="🎬 Macro", command=self._add_macro, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="◆ Macro", command=self._add_macro, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(btn_frame, text="➕ Agregar", command=self._add_script, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="+ Agregar", command=self._add_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(btn_frame, text="✏️ Editar", command=self._edit_script, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="✎ Editar", command=self._edit_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(btn_frame, text="📋 Clonar", command=self._clone_script, style="Compact.TButton").pack(
+        ttk.Button(btn_frame, text="❐ Clonar", command=self._clone_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
         ttk.Button(btn_frame, text="🗑️ Quitar", command=self._remove_script, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(btn_frame, text="⬆", command=self._move_up, style="Compact.TButton", width=3).pack(
+        ttk.Button(btn_frame, text="↑", command=self._move_up, style="Compact.TButton", width=3).pack(
             side=tk.LEFT, padx=(8, 1)
         )
-        ttk.Button(btn_frame, text="⬇", command=self._move_down, style="Compact.TButton", width=3).pack(
+        ttk.Button(btn_frame, text="↓", command=self._move_down, style="Compact.TButton", width=3).pack(
             side=tk.LEFT, padx=1
         )
 
@@ -844,13 +847,13 @@ class OrchestratorApp:
         group_btn_frame = ttk.Frame(self.root)
         group_btn_frame.pack(fill=tk.X, padx=5, pady=(0, 3))
 
-        ttk.Button(group_btn_frame, text="📁 Agrupar", command=self._group_selected, style="Compact.TButton").pack(
+        ttk.Button(group_btn_frame, text="⊞ Agrupar", command=self._group_selected, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(group_btn_frame, text="✂️ Desagrupar", command=self._ungroup_selected, style="Compact.TButton").pack(
+        ttk.Button(group_btn_frame, text="⊟ Desagrupar", command=self._ungroup_selected, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(group_btn_frame, text="🏷️ Renombrar", command=self._rename_group, style="Compact.TButton").pack(
+        ttk.Button(group_btn_frame, text="✐ Renombrar", command=self._rename_group, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
 
@@ -881,13 +884,13 @@ class OrchestratorApp:
         self.progress_pct_label.pack(side=tk.LEFT, padx=(3, 0))
 
         # Botones de acción
-        ttk.Button(exec_frame, text="▶ Iniciar", command=self._start, style="Compact.TButton").pack(
+        ttk.Button(exec_frame, text="▸ Iniciar", command=self._start, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(exec_frame, text="▶1 Seleccionado", command=self._run_selected, style="Compact.TButton").pack(
+        ttk.Button(exec_frame, text="▸1 Seleccionado", command=self._run_selected, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
-        ttk.Button(exec_frame, text="⏹ Detener", command=self._stop, style="Compact.TButton").pack(
+        ttk.Button(exec_frame, text="■ Detener", command=self._stop, style="Compact.TButton").pack(
             side=tk.LEFT, padx=2
         )
 
@@ -1326,16 +1329,16 @@ class OrchestratorApp:
 
         if info[0] == "group":
             group_path = info[1]
-            menu.add_command(label="📁 Crear subgrupo aquí",
+            menu.add_command(label="⊞ Crear subgrupo aquí",
                            command=lambda: self._context_create_subgroup(group_path))
-            menu.add_command(label="➕ Agregar scripts al grupo",
+            menu.add_command(label="+ Agregar scripts al grupo",
                            command=lambda: self._context_add_to_group(group_path))
-            menu.add_command(label="🏷️ Renombrar",
+            menu.add_command(label="✐ Renombrar",
                            command=lambda: self._rename_group_dialog(group_path))
             menu.add_separator()
-            menu.add_command(label="✂️ Desagrupar todo",
+            menu.add_command(label="⊟ Desagrupar todo",
                            command=lambda: self._context_ungroup(group_path))
-            menu.add_command(label="🗑️ Eliminar grupo",
+            menu.add_command(label="✕ Eliminar grupo",
                            command=lambda: self._context_remove_group(group_path))
 
         elif info[0] == "script":
@@ -1343,14 +1346,14 @@ class OrchestratorApp:
             item = self.playlist[idx]
 
             if item.get("type") == "macro":
-                menu.add_command(label="🎬 Editar macro",
+                menu.add_command(label="◆ Editar macro",
                                command=lambda i=idx: self._edit_macro(i))
-            menu.add_command(label="⚙️ Condiciones",
+            menu.add_command(label="⚙ Condiciones",
                            command=lambda i=idx: self._edit_conditions(i))
             menu.add_separator()
-            menu.add_command(label="📁 Agrupar seleccionados",
+            menu.add_command(label="⊞ Agrupar seleccionados",
                            command=self._group_selected)
-            menu.add_command(label="✂️ Desagrupar",
+            menu.add_command(label="⊟ Desagrupar",
                            command=self._ungroup_selected)
 
         menu.tk_popup(event.x_root, event.y_root)
@@ -1920,13 +1923,13 @@ class OrchestratorApp:
                 entry.bind("<Return>", lambda e: _save_label())
                 ttk.Button(lbl_win, text="Guardar", command=_save_label).pack()
 
-        ttk.Button(btn_frame, text="➕ Agregar", command=_add_condition,
+        ttk.Button(btn_frame, text="+ Agregar", command=_add_condition,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
         ttk.Button(btn_frame, text="🗑️ Quitar", command=_remove_condition,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="🔄 Cambiar tipo", command=_toggle_type,
+        ttk.Button(btn_frame, text="↻ Cambiar tipo", command=_toggle_type,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="🏷️ Etiqueta", command=_edit_label,
+        ttk.Button(btn_frame, text="✐ Etiqueta", command=_edit_label,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
         def _edit_threshold():
@@ -2131,7 +2134,7 @@ class OrchestratorApp:
                 msg, msg_type
             )
 
-        ttk.Button(btn_frame, text="🔍 Probar", command=_test_icon,
+        ttk.Button(btn_frame, text="◉ Probar", command=_test_icon,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
 
         # ── Botón Probar TODAS las condiciones ──
@@ -2284,7 +2287,7 @@ class OrchestratorApp:
             if path:
                 fallback_script_var.set(path)
 
-        ttk.Button(fb_exe_row, text="📂 Elegir", command=_pick_fallback,
+        ttk.Button(fb_exe_row, text="◷ Elegir", command=_pick_fallback,
                    style="Compact.TButton").pack(side=tk.RIGHT, padx=(4, 0))
 
         # ── Selector de macro ──
@@ -2376,11 +2379,11 @@ class OrchestratorApp:
                 cond_copy["items"].clear()
                 _refresh_cond_list()
 
-        ttk.Button(bottom, text="🗑️ Limpiar todo", command=_clear_all,
+        ttk.Button(bottom, text="✕ Limpiar todo", command=_clear_all,
                    style="Compact.TButton").pack(side=tk.LEFT, padx=2)
         ttk.Button(bottom, text="Cancelar", command=dlg.destroy,
                    style="Compact.TButton").pack(side=tk.RIGHT, padx=2)
-        ttk.Button(bottom, text="✅ Guardar", command=_save,
+        ttk.Button(bottom, text="✓ Guardar", command=_save,
                    style="Compact.TButton").pack(side=tk.RIGHT, padx=2)
 
         dlg.wait_window()

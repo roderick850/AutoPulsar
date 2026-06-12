@@ -33,22 +33,22 @@ import threading
 from macro_recorder import MacroRecorder
 from macro_player import MacroPlayer, events_to_actions, actions_to_events
 
-# ── Colores (coinciden con gui.py DARK_COLORS) ──
+# ── Colores — Vercel Sleek (coinciden con gui.py DARK_COLORS) ──
 C = {
-    "bg": "#0d0d0d",
-    "surface": "#1a1a1a",
-    "surface2": "#212121",
-    "border": "#3a3a3a",
-    "text": "#e0e0e0",
-    "text2": "#808080",
-    "accent": "#1f538d",
-    "accent2": "#14375e",
-    "green": "#2e8b57",
-    "red": "#c44545",
-    "yellow": "#c4a43d",
-    "blue": "#3a7ebf",
-    "purple": "#7c5cbf",
-    "orange": "#d98a3a",
+    "bg": "#0a0a0a",
+    "surface": "#141414",
+    "surface2": "#1a1a1a",
+    "border": "#2a2a2a",
+    "text": "#fafafa",
+    "text2": "#888888",
+    "accent": "#8b5cf6",
+    "accent2": "#9d74f7",
+    "green": "#10b981",
+    "red": "#ef4444",
+    "yellow": "#f59e0b",
+    "blue": "#3b82f6",
+    "purple": "#8b5cf6",
+    "orange": "#f59e0b",
 }
 
 # ── Colores para teclas por tipo ──
@@ -184,9 +184,9 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self._btn_play = ttk.Button(top, text="▶️ Probar", command=self._play_macro, style="Compact.TButton")
         self._btn_play.pack(side=tk.LEFT, padx=3)
 
-        ttk.Button(top, text="➕ Añadir Tecla", command=self._add_key, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
-        ttk.Button(top, text="➕ Añadir Click", command=self._add_click, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
-        ttk.Button(top, text="➕ Añadir Espera", command=self._add_wait, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
+        ttk.Button(top, text="+ Añadir Tecla", command=self._add_key, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
+        ttk.Button(top, text="+ Añadir Click", command=self._add_click, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
+        ttk.Button(top, text="+ Añadir Espera", command=self._add_wait, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
 
         # ── Status ──
         status_frame = ttk.Frame(self, padding=(8, 0, 8, 4))
@@ -224,7 +224,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         # ── Botón guardar ──
         btn_frame = ttk.Frame(self, padding=8)
         btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="💾 Guardar Macro y Cerrar", command=self._save_and_close, style="Accent.TButton").pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="✓ Guardar Macro y Cerrar", command=self._save_and_close, style="Accent.TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Cancelar", command=self._close, style="Compact.TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self._clear_all, style="Danger.TButton").pack(side=tk.LEFT, padx=5)
 
