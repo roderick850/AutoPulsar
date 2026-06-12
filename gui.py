@@ -1574,19 +1574,15 @@ class OrchestratorApp:
 
         dlg = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         dlg.title(f"Condiciones — {name}")
-        dlg.geometry("750x620")
-        dlg.resizable(False, False)
+        dlg.minsize(700, 500)
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.lift()
         _apply_dark_titlebar(dlg, retries=3)
 
-        # Centrar sobre la ventana principal
-        dlg.update_idletasks()
-        pw, ph = self.root.winfo_width(), self.root.winfo_height()
-        px, py = self.root.winfo_x(), self.root.winfo_y()
-        dw, dh = dlg.winfo_width(), dlg.winfo_height()
-        dlg.geometry(f"750x620+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        # Restore saved geometry or default + center
+        self._restore_win_geometry(dlg, "condition_editor_geometry", "750x620")
+        self._bind_geo_save(dlg, "condition_editor_geometry")
 
         pad = {"padx": 8, "pady": 4}
         c = DARK_COLORS
@@ -2402,8 +2398,7 @@ class OrchestratorApp:
 
         win = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         win.title("Agregar script")
-        win.geometry("360x460")
-        win.resizable(False, False)
+        win.minsize(300, 380)
         win.transient(self.root)
         win.grab_set()
         win.lift()
@@ -2411,12 +2406,9 @@ class OrchestratorApp:
         # Dark titlebar
         win.after(50, lambda: _apply_dark_titlebar(win, retries=3))
 
-        # Center on parent
-        win.update_idletasks()
-        pw, ph = self.root.winfo_width(), self.root.winfo_height()
-        px, py = self.root.winfo_x(), self.root.winfo_y()
-        dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"360x460+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        # Restore saved geometry or default + center
+        self._restore_win_geometry(win, "script_editor_geometry", "360x460")
+        self._bind_geo_save(win, "script_editor_geometry")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
@@ -2491,7 +2483,7 @@ class OrchestratorApp:
             self.playlist.append(item)
             self._refresh_list()
 
-        MacroEditorWindow(self.root, on_save=on_save)
+        MacroEditorWindow(self.root, on_save=on_save, settings=self.settings)
 
     def _edit_macro(self, idx):
         """Abre el editor de macros para editar una macro existente."""
@@ -2511,7 +2503,8 @@ class OrchestratorApp:
             self._refresh_list()
 
         MacroEditorWindow(self.root, on_save=on_save,
-                          initial_actions=actions, initial_name=name)
+                          initial_actions=actions, initial_name=name,
+                          settings=self.settings)
 
     def _edit_script(self):
         sel = self.tree.selection()
@@ -2532,8 +2525,7 @@ class OrchestratorApp:
 
         win = ctk.CTkToplevel(self.root, fg_color=DARK_COLORS["bg"])
         win.title("Editar script")
-        win.geometry("360x460")
-        win.resizable(False, False)
+        win.minsize(300, 380)
         win.transient(self.root)
         win.grab_set()
         win.lift()
@@ -2541,12 +2533,9 @@ class OrchestratorApp:
         # Dark titlebar
         win.after(50, lambda: _apply_dark_titlebar(win, retries=3))
 
-        # Center on parent
-        win.update_idletasks()
-        pw, ph = self.root.winfo_width(), self.root.winfo_height()
-        px, py = self.root.winfo_x(), self.root.winfo_y()
-        dw, dh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"360x460+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+        # Restore saved geometry or default + center
+        self._restore_win_geometry(win, "script_editor_geometry", "360x460")
+        self._bind_geo_save(win, "script_editor_geometry")
 
         form = ttk.Frame(win, padding=10)
         form.pack(fill=tk.BOTH, expand=True)
@@ -3038,6 +3027,49 @@ class OrchestratorApp:
     # ═══════════════════════════════════════════════════════════════
     # EXECUTION
     # ═══════════════════════════════════════════════════════════════
+
+    def _restore_win_geometry(self, win, settings_key, default_size, parent=None):
+        """Restore saved geometry or center with default size on parent."""
+        saved = self.settings.get(settings_key, "")
+        if saved:
+            try:
+                win.geometry(saved)
+                return
+            except tk.TclError:
+                pass
+        # Default: set size and center on parent or screen
+        win.geometry(default_size)
+        win.update_idletasks()
+        if parent is None:
+            parent = self.root
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        px, py = parent.winfo_x(), parent.winfo_y()
+        dw, dh = win.winfo_width(), win.winfo_height()
+        # Fallback to screen center if parent has no real dimensions yet
+        if pw < 100 or ph < 100:
+            sw = win.winfo_screenwidth()
+            sh = win.winfo_screenheight()
+            win.geometry(f"{default_size}+{(sw - dw)//2}+{(sh - dh)//2}")
+        else:
+            win.geometry(f"{default_size}+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
+    def _bind_geo_save(self, win, settings_key):
+        """Save window geometry on close (WM_DELETE_WINDOW + Destroy)."""
+        def _save_and_destroy():
+            try:
+                self.settings[settings_key] = win.geometry()
+            except tk.TclError:
+                pass
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW", _save_and_destroy)
+        # Also save on any destroy (e.g., Cancel button)
+        def _on_destroy(_event=None):
+            try:
+                if win.winfo_exists():
+                    self.settings[settings_key] = win.geometry()
+            except tk.TclError:
+                pass
+        win.bind("<Destroy>", _on_destroy, add="+")
 
     def _gather_settings(self):
         settings = {

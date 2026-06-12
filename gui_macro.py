@@ -118,14 +118,30 @@ def format_s(seconds):
 class MacroEditorWindow(ctk.CTkToplevel):
     """Ventana principal del editor de macros."""
 
-    def __init__(self, parent, on_save=None, initial_actions=None, initial_name=""):
+    def __init__(self, parent, on_save=None, initial_actions=None, initial_name="", settings=None):
         super().__init__(parent, fg_color=C["bg"])
         self.title("Editor de Macros — AutoPulsar")
-        self.geometry("950x650")
         self.minsize(700, 400)
         self.transient(parent)
         self.grab_set()
-        self._center_on(parent)
+
+        # ── Geometry: restore saved or default + center ──
+        self._settings = settings or {}
+        saved = self._settings.get("macro_editor_geometry", "")
+        if saved:
+            try:
+                self.geometry(saved)
+            except tk.TclError:
+                self.geometry("950x650")
+                self._center_on(parent)
+        else:
+            self.geometry("950x650")
+            self._center_on(parent)
+
+        # Save geometry on close
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self.bind("<Destroy>", self._on_destroy_geo, add="+")
+
         _apply_dark_titlebar(self)
         try:
             self.iconbitmap(_get_icon_path())
@@ -209,7 +225,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         btn_frame = ttk.Frame(self, padding=8)
         btn_frame.pack(fill=tk.X)
         ttk.Button(btn_frame, text="💾 Guardar Macro y Cerrar", command=self._save_and_close, style="Accent.TButton").pack(side=tk.RIGHT, padx=5)
-        ttk.Button(btn_frame, text="Cancelar", command=self.destroy, style="Compact.TButton").pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancelar", command=self._close, style="Compact.TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self._clear_all, style="Danger.TButton").pack(side=tk.LEFT, padx=5)
 
     # ── Recording ─────────────────────────────────────────
@@ -518,6 +534,26 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     # ── Save ──────────────────────────────────────────────
+
+    def _close(self):
+        """Save geometry and destroy."""
+        self._save_geometry()
+        self.destroy()
+
+    def _on_destroy_geo(self, _event=None):
+        """Save geometry on any destroy (Cancel button, etc.)."""
+        try:
+            if self.winfo_exists():
+                self._save_geometry()
+        except tk.TclError:
+            pass
+
+    def _save_geometry(self):
+        """Persist current window geometry to settings."""
+        try:
+            self._settings["macro_editor_geometry"] = self.geometry()
+        except tk.TclError:
+            pass
 
     def _save_and_close(self):
         name = self.macro_name.get().strip()
