@@ -13,21 +13,21 @@ import os
 import sys
 import ctypes
 
-# ── Dark Theme — Vercel Sleek (violet accent) ──────────────────────
+# ── Dark Theme (mismos colores que la app principal) ──────────────
 DARK_COLORS = {
-    "bg":           "#0a0a0a",
-    "surface":      "#141414",
-    "surface_alt":  "#1a1a1a",
-    "border":       "#2a2a2a",
-    "text":         "#fafafa",
-    "text_dim":     "#888888",
-    "accent":       "#8b5cf6",
-    "accent_hover": "#9d74f7",
-    "green":        "#10b981",
-    "red":          "#ef4444",
-    "yellow":       "#f59e0b",
-    "blue":         "#3b82f6",
-    "purple":       "#8b5cf6",
+    "bg":           "#1e1e2e",
+    "surface":      "#282840",
+    "surface_alt":  "#313148",
+    "border":       "#3b3b56",
+    "text":         "#cdd6f4",
+    "text_dim":     "#8b8da8",
+    "accent":       "#7c7cf8",
+    "accent_hover": "#9696ff",
+    "green":        "#5cce8e",
+    "red":          "#e06070",
+    "yellow":       "#e0b860",
+    "blue":         "#6090e0",
+    "purple":       "#b090e0",
 }
 
 
@@ -197,7 +197,7 @@ class MiniBar:
         # ── Botón Pin (always-on-top toggle) ──
         self._pinned = pinned
         self.pin_btn = tk.Button(
-            bar, text="◆", command=self._toggle_pin,
+            bar, text="📌", command=self._toggle_pin,
             bg=c["surface"] if pinned else c["bg"],
             fg=c["text"] if pinned else c["text_dim"],
             font=("Segoe UI", 8),
