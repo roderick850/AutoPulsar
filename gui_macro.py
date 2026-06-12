@@ -24,8 +24,7 @@ def _apply_dark_titlebar(window):
             hwnd,
             DWMWA_USE_IMMERSIVE_DARK_MODE,
             ctypes.byref(ctypes.c_int(1)),
-            ctypes.sizeof(ctypes.c_int(1)),
-        )
+            ctypes.sizeof(ctypes.c_int(1)))
     except Exception:
         pass  # Pre-Windows 10 20H1 — la barra queda clara
 import threading
@@ -175,26 +174,26 @@ class MacroEditorWindow(ctk.CTkToplevel):
         top = ttk.Frame(self, padding=8)
         top.pack(fill=tk.X)
 
-        ttk.Label(top, text="Nombre:", style="Compact.TLabel").pack(side=tk.LEFT, padx=(0, 6))
-        ttk.Entry(top, textvariable=self.macro_name, width=25).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkLabel(top, text="Nombre:").pack(side=tk.LEFT, padx=(0, 6))
+        ctk.CTkEntry(top, textvariable=self.macro_name, width=25).pack(side=tk.LEFT, padx=(0, 10))
 
-        self._btn_rec = ttk.Button(top, text="⏺️ Grabar", command=self._toggle_record, style="Compact.TButton")
+        self._btn_rec = ctk.CTkButton(top, text="⏺️ Grabar", command=self._toggle_record)
         self._btn_rec.pack(side=tk.LEFT, padx=3)
 
-        self._btn_play = ttk.Button(top, text="▶️ Probar", command=self._play_macro, style="Compact.TButton")
+        self._btn_play = ctk.CTkButton(top, text="▶️ Probar", command=self._play_macro)
         self._btn_play.pack(side=tk.LEFT, padx=3)
 
-        ttk.Button(top, text="➕ Añadir Tecla", command=self._add_key, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
-        ttk.Button(top, text="➕ Añadir Click", command=self._add_click, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
-        ttk.Button(top, text="➕ Añadir Espera", command=self._add_wait, style="Compact.TButton").pack(side=tk.LEFT, padx=3)
+        ctk.CTkButton(top, text="➕ Añadir Tecla", command=self._add_key).pack(side=tk.LEFT, padx=3)
+        ctk.CTkButton(top, text="➕ Añadir Click", command=self._add_click).pack(side=tk.LEFT, padx=3)
+        ctk.CTkButton(top, text="➕ Añadir Espera", command=self._add_wait).pack(side=tk.LEFT, padx=3)
 
         # ── Status ──
         status_frame = ttk.Frame(self, padding=(8, 0, 8, 4))
         status_frame.pack(fill=tk.X)
-        self._status_label = ttk.Label(status_frame, textvariable=self.status_text, style="Dim.TLabel")
+        self._status_label = ctk.CTkLabel(status_frame, textvariable=self.status_text)
         self._status_label.pack(side=tk.LEFT)
 
-        self._counter_label = ttk.Label(status_frame, text="", style="Dim.TLabel")
+        self._counter_label = ctk.CTkLabel(status_frame, text="")
         self._counter_label.pack(side=tk.RIGHT)
 
         # ── Timeline (Canvas + Scrollbar) ──
@@ -205,8 +204,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
             canvas_frame,
             bg=C["surface"],
             highlightthickness=0,
-            bd=0,
-        )
+            bd=0)
         scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self._canvas.yview)
         self._canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -214,7 +212,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Frame dentro del canvas
-        self._inner = ttk.Frame(self._canvas, style="Surface.TFrame")
+        self._inner = ttk.Frame(self._canvas)
         self._win_id = self._canvas.create_window((0, 0), window=self._inner, anchor="nw", tags="inner")
 
         self._inner.bind("<Configure>", self._on_inner_configure)
@@ -224,9 +222,9 @@ class MacroEditorWindow(ctk.CTkToplevel):
         # ── Botón guardar ──
         btn_frame = ttk.Frame(self, padding=8)
         btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="💾 Guardar Macro y Cerrar", command=self._save_and_close, style="Accent.TButton").pack(side=tk.RIGHT, padx=5)
-        ttk.Button(btn_frame, text="Cancelar", command=self._close, style="Compact.TButton").pack(side=tk.RIGHT, padx=5)
-        ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self._clear_all, style="Danger.TButton").pack(side=tk.LEFT, padx=5)
+        ctk.CTkButton(btn_frame, text="💾 Guardar Macro y Cerrar", command=self._save_and_close).pack(side=tk.RIGHT, padx=5)
+        ctk.CTkButton(btn_frame, text="Cancelar", command=self._close).pack(side=tk.RIGHT, padx=5)
+        ctk.CTkButton(btn_frame, text="🗑️ Limpiar Todo", command=self._clear_all).pack(side=tk.LEFT, padx=5)
 
     # ── Recording ─────────────────────────────────────────
 
@@ -400,7 +398,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
         self._counter_label.config(text=f"{len(self.actions)} acciones")
 
         if not self.actions:
-            ttk.Label(self._inner, text="(sin acciones — graba o añade manualmente)", style="Dim.TLabel", padding=20).pack()
+            ctk.CTkLabel(self._inner, text="(sin acciones — graba o añade manualmente)", padding=20).pack()
             return
 
         for i, act in enumerate(self.actions):
@@ -425,12 +423,12 @@ class MacroEditorWindow(ctk.CTkToplevel):
         return None
 
     def _render_row(self, idx, act):
-        row = ttk.Frame(self._inner, style="Surface.TFrame")
+        row = ttk.Frame(self._inner)
 
         # ── Índice + tiempo acumulado ──
         cum_time = self._cumulative_time(idx)
-        ttk.Label(row, text=f"#{idx+1}", style="Dim.TLabel", width=4).pack(side=tk.LEFT, padx=(4, 2))
-        ttk.Label(row, text=format_s(cum_time), style="Dim.TLabel", width=7, anchor="e").pack(side=tk.LEFT, padx=(0, 4))
+        ctk.CTkLabel(row, text=f"#{idx+1}", width=35).pack(side=tk.LEFT, padx=(4, 2))
+        ctk.CTkLabel(row, text=format_s(cum_time), width=50).pack(side=tk.LEFT, padx=(0, 4))
 
         # ── Keycap visual ──
         if act["action"] == "press" and act.get("key") == "__wait__":
@@ -440,12 +438,12 @@ class MacroEditorWindow(ctk.CTkToplevel):
             cap.create_text(25, 18, text="⏳", font=("Segoe UI", 13), fill="#c0c060", tags="key")
             cap.pack(side=tk.LEFT, padx=2)
 
-            ttk.Label(row, text="Espera", style="Compact.TLabel", anchor="w", width=14).pack(side=tk.LEFT, padx=4)
+            ctk.CTkLabel(row, text="Espera", anchor="w", width=14).pack(side=tk.LEFT, padx=4)
 
             wait_var = tk.StringVar(value=str(wait))
-            ttk.Label(row, text=format_s(wait), style="Dim.TLabel", width=7).pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=wait_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
+            ctk.CTkLabel(row, text=format_s(wait), width=50).pack(side=tk.LEFT, padx=(8, 2))
+            ctk.CTkEntry(row, textvariable=wait_var, width=60).pack(side=tk.LEFT)
+            ctk.CTkButton(row, text="✓", width=2, command=lambda v=wait_var, i=idx: self._update_attr(i, "wait_before", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         elif act["action"] == "press":
             key = act.get("key", "?")
@@ -457,13 +455,13 @@ class MacroEditorWindow(ctk.CTkToplevel):
             cap.create_text(24, 18, text=disp, font=("Segoe UI", 11, "bold"), fill=fg, tags="key")
             cap.pack(side=tk.LEFT, padx=2)
 
-            ttk.Label(row, text="Presionar", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
+            ctk.CTkLabel(row, text="Presionar", width=70, anchor="w").pack(side=tk.LEFT, padx=4)
 
             dur = act.get("press_duration", 0.15)
             dur_var = tk.StringVar(value=str(dur))
-            ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
+            ctk.CTkLabel(row, text="Presión:").pack(side=tk.LEFT, padx=(8, 2))
+            ctk.CTkEntry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
+            ctk.CTkButton(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         elif act["action"] == "click":
             btn = act.get("button", "left")
@@ -474,35 +472,35 @@ class MacroEditorWindow(ctk.CTkToplevel):
             cap.create_text(24, 18, text="R" if btn == "right" else "🖱", font=("Segoe UI", 9 if btn == "right" else 12, "bold" if btn == "right" else "normal"), fill=fg)
             cap.pack(side=tk.LEFT, padx=2)
 
-            ttk.Label(row, text=f"Click {btn}", style="Compact.TLabel", width=14, anchor="w").pack(side=tk.LEFT, padx=4)
-            ttk.Label(row, text=f"({act.get('x',0)},{act.get('y',0)})", style="Dim.TLabel", width=12).pack(side=tk.LEFT)
+            ctk.CTkLabel(row, text=f"Click {btn}", width=80, anchor="w").pack(side=tk.LEFT, padx=4)
+            ctk.CTkLabel(row, text=f"({act.get('x',0)},{act.get('y',0)})", width=100).pack(side=tk.LEFT)
 
             dur = act.get("press_duration", 0.05)
             dur_var = tk.StringVar(value=str(dur))
-            ttk.Label(row, text="Presión:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(8, 2))
-            ttk.Entry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
-            ttk.Button(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
+            ctk.CTkLabel(row, text="Presión:").pack(side=tk.LEFT, padx=(8, 2))
+            ctk.CTkEntry(row, textvariable=dur_var, width=6).pack(side=tk.LEFT)
+            ctk.CTkButton(row, text="✓", width=2, command=lambda v=dur_var, i=idx: self._update_attr(i, "press_duration", float(v.get()))).pack(side=tk.LEFT, padx=1)
 
         # Botones de reorden y acción
-        ttk.Button(row, text="⬆", width=2, command=lambda i=idx: self._move_up(i)).pack(side=tk.RIGHT, padx=1)
-        ttk.Button(row, text="⬇", width=2, command=lambda i=idx: self._move_down(i)).pack(side=tk.RIGHT, padx=1)
-        ttk.Button(row, text="✎", width=2, command=lambda i=idx: self._edit_action(i)).pack(side=tk.RIGHT, padx=1)
-        ttk.Button(row, text="🗑", width=2, command=lambda i=idx: self._remove_action(i)).pack(side=tk.RIGHT, padx=1)
+        ctk.CTkButton(row, text="⬆", width=26, command=lambda i=idx: self._move_up(i)).pack(side=tk.RIGHT, padx=1)
+        ctk.CTkButton(row, text="⬇", width=26, command=lambda i=idx: self._move_down(i)).pack(side=tk.RIGHT, padx=1)
+        ctk.CTkButton(row, text="✎", width=26, command=lambda i=idx: self._edit_action(i)).pack(side=tk.RIGHT, padx=1)
+        ctk.CTkButton(row, text="🗑", width=26, command=lambda i=idx: self._remove_action(i)).pack(side=tk.RIGHT, padx=1)
 
         return row
 
     def _render_wait_row(self, idx, wait):
         """Sub-fila indentada mostrando la espera hasta la siguiente acción."""
-        sub = ttk.Frame(self._inner, style="Surface.TFrame")
+        sub = ttk.Frame(self._inner)
 
         # Espaciado para alinear con la acción de arriba
-        ttk.Label(sub, text="", width=13).pack(side=tk.LEFT)  # compensa #N + tiempo
-        ttk.Label(sub, text="   ⏳  Espera:", style="Dim.TLabel").pack(side=tk.LEFT, padx=(2, 4))
-        ttk.Label(sub, text=format_s(wait), style="Dim.TLabel", width=7).pack(side=tk.LEFT)
+        ctk.CTkLabel(sub, text="", width=13).pack(side=tk.LEFT)  # compensa #N + tiempo
+        ctk.CTkLabel(sub, text="   ⏳  Espera:").pack(side=tk.LEFT, padx=(2, 4))
+        ctk.CTkLabel(sub, text=format_s(wait), width=7).pack(side=tk.LEFT)
 
         wait_var = tk.StringVar(value=str(wait))
-        ttk.Entry(sub, textvariable=wait_var, width=6).pack(side=tk.LEFT, padx=(4, 2))
-        ttk.Button(sub, text="✓", width=2,
+        ctk.CTkEntry(sub, textvariable=wait_var, width=6).pack(side=tk.LEFT, padx=(4, 2))
+        ctk.CTkButton(sub, text="✓", width=2,
                    command=lambda v=wait_var, i=idx+1: self._update_attr(i, "wait_before", float(v.get()))
                    ).pack(side=tk.LEFT, padx=1)
 
@@ -603,15 +601,15 @@ class _InputDialog(ctk.CTkToplevel):
         for i in range(0, len(fields), 2):
             lbl = fields[i]
             default = fields[i+1]
-            ttk.Label(frm, text=lbl, style="Compact.TLabel").pack(anchor="w", pady=(6, 2))
+            ctk.CTkLabel(frm, text=lbl).pack(anchor="w", pady=(6, 2))
             var = tk.StringVar(value=default)
-            ttk.Entry(frm, textvariable=var, width=30).pack(fill=tk.X)
+            ctk.CTkEntry(frm, textvariable=var, width=30).pack(fill=tk.X)
             self._vars.append(var)
 
         btn_frame = ttk.Frame(frm)
         btn_frame.pack(fill=tk.X, pady=(12, 0))
-        ttk.Button(btn_frame, text="Cancelar", command=self.destroy, style="Compact.TButton").pack(side=tk.RIGHT, padx=3)
-        ttk.Button(btn_frame, text="Aceptar", command=self._ok, style="Accent.TButton").pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Cancelar", command=self.destroy).pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Aceptar", command=self._ok).pack(side=tk.RIGHT, padx=3)
 
         self.transient(parent)
         self.grab_set()
@@ -658,14 +656,14 @@ class _SimpleInput(ctk.CTkToplevel):
         frm = ttk.Frame(self, padding=15)
         frm.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frm, text=label, style="Compact.TLabel").pack(anchor="w", pady=(6, 4))
+        ctk.CTkLabel(frm, text=label).pack(anchor="w", pady=(6, 4))
         self._var = tk.StringVar(value=default)
-        ttk.Entry(frm, textvariable=self._var, width=25).pack(fill=tk.X)
+        ctk.CTkEntry(frm, textvariable=self._var, width=25).pack(fill=tk.X)
 
         btn_frame = ttk.Frame(frm)
         btn_frame.pack(fill=tk.X, pady=(12, 0))
-        ttk.Button(btn_frame, text="Cancelar", command=self.destroy, style="Compact.TButton").pack(side=tk.RIGHT, padx=3)
-        ttk.Button(btn_frame, text="Aceptar", command=self._ok, style="Accent.TButton").pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Cancelar", command=self.destroy).pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Aceptar", command=self._ok).pack(side=tk.RIGHT, padx=3)
 
         self.transient(parent)
         self.grab_set()
@@ -702,11 +700,11 @@ class _WaitDialog(ctk.CTkToplevel):
         frm = ttk.Frame(self, padding=15)
         frm.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frm, text="Segundos:", style="Compact.TLabel").pack(anchor="w", pady=(6, 4))
+        ctk.CTkLabel(frm, text="Segundos:").pack(anchor="w", pady=(6, 4))
         self._sec_var = tk.StringVar(value="0.5")
-        ttk.Entry(frm, textvariable=self._sec_var, width=10).pack(fill=tk.X)
+        ctk.CTkEntry(frm, textvariable=self._sec_var, width=10).pack(fill=tk.X)
 
-        ttk.Label(frm, text="Posición:", style="Compact.TLabel").pack(anchor="w", pady=(12, 4))
+        ctk.CTkLabel(frm, text="Posición:").pack(anchor="w", pady=(12, 4))
         self._pos_var = tk.StringVar(value="end")
         rb_frame = ttk.Frame(frm)
         rb_frame.pack(fill=tk.X)
@@ -715,8 +713,8 @@ class _WaitDialog(ctk.CTkToplevel):
 
         btn_frame = ttk.Frame(frm)
         btn_frame.pack(fill=tk.X, pady=(12, 0))
-        ttk.Button(btn_frame, text="Cancelar", command=self.destroy, style="Compact.TButton").pack(side=tk.RIGHT, padx=3)
-        ttk.Button(btn_frame, text="Aceptar", command=self._ok, style="Accent.TButton").pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Cancelar", command=self.destroy).pack(side=tk.RIGHT, padx=3)
+        ctk.CTkButton(btn_frame, text="Aceptar", command=self._ok).pack(side=tk.RIGHT, padx=3)
 
         self.transient(parent)
         self.grab_set()
