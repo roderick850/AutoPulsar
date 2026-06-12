@@ -170,22 +170,26 @@ class MacroEditorWindow(ctk.CTkToplevel):
     # ── UI Build ──────────────────────────────────────────
 
     def _build_ui(self):
-        # ── Top bar: nombre + grabar ──
-        top = ttk.Frame(self, padding=8)
-        top.pack(fill=tk.X)
+        # ── Row 1: nombre del macro ──
+        top_name = ttk.Frame(self, padding=(8, 8, 8, 2))
+        top_name.pack(fill=tk.X)
 
-        ctk.CTkLabel(top, text="Nombre:").pack(side=tk.LEFT, padx=(0, 6))
-        ctk.CTkEntry(top, textvariable=self.macro_name, width=25).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkLabel(top_name, text="Nombre:").pack(side=tk.LEFT, padx=(0, 6))
+        ctk.CTkEntry(top_name, textvariable=self.macro_name, width=300).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self._btn_rec = ctk.CTkButton(top, text="⏺️ Grabar", command=self._toggle_record)
-        self._btn_rec.pack(side=tk.LEFT, padx=3)
+        # ── Row 2: botones de acción ──
+        top_btns = ttk.Frame(self, padding=(8, 2, 8, 4))
+        top_btns.pack(fill=tk.X)
 
-        self._btn_play = ctk.CTkButton(top, text="▶️ Probar", command=self._play_macro)
-        self._btn_play.pack(side=tk.LEFT, padx=3)
+        self._btn_rec = ctk.CTkButton(top_btns, text="⏺️ Grabar", command=self._toggle_record)
+        self._btn_rec.pack(side=tk.LEFT, padx=2)
 
-        ctk.CTkButton(top, text="➕ Añadir Tecla", command=self._add_key).pack(side=tk.LEFT, padx=3)
-        ctk.CTkButton(top, text="➕ Añadir Click", command=self._add_click).pack(side=tk.LEFT, padx=3)
-        ctk.CTkButton(top, text="➕ Añadir Espera", command=self._add_wait).pack(side=tk.LEFT, padx=3)
+        self._btn_play = ctk.CTkButton(top_btns, text="▶️ Probar", command=self._play_macro)
+        self._btn_play.pack(side=tk.LEFT, padx=2)
+
+        ctk.CTkButton(top_btns, text="➕ Añadir Tecla", command=self._add_key).pack(side=tk.LEFT, padx=2)
+        ctk.CTkButton(top_btns, text="➕ Añadir Click", command=self._add_click).pack(side=tk.LEFT, padx=2)
+        ctk.CTkButton(top_btns, text="➕ Añadir Espera", command=self._add_wait).pack(side=tk.LEFT, padx=2)
 
         # ── Status ──
         status_frame = ttk.Frame(self, padding=(8, 0, 8, 4))
