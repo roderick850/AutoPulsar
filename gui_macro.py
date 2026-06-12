@@ -543,8 +543,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
     def _on_destroy_geo(self, _event=None):
         """Save geometry on any destroy (Cancel button, etc.)."""
         try:
-            if self.winfo_exists():
-                self._save_geometry()
+            self._save_geometry()
         except tk.TclError:
             pass
 

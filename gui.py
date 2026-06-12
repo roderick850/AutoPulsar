@@ -3062,11 +3062,10 @@ class OrchestratorApp:
                 pass
             win.destroy()
         win.protocol("WM_DELETE_WINDOW", _save_and_destroy)
-        # Also save on any destroy (e.g., Cancel button)
+        # Also save on any destroy (e.g., Cancel button via destroy())
         def _on_destroy(_event=None):
             try:
-                if win.winfo_exists():
-                    self.settings[settings_key] = win.geometry()
+                self.settings[settings_key] = win.geometry()
             except tk.TclError:
                 pass
         win.bind("<Destroy>", _on_destroy, add="+")
