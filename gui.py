@@ -720,13 +720,13 @@ class OrchestratorApp:
         ctk.CTkLabel(loop_frame, text="×").pack(side=tk.LEFT, padx=(8, 3))
         self.loop_count_var = tk.StringVar(value=str(self.settings.get("loop_count", 1)))
         self.loop_count_entry = ctk.CTkEntry(loop_frame, textvariable=self.loop_count_var, width=60, validate="key")
-        self.loop_count_entry.config(validatecommand=(self.root.register(self._validate_int_positive), "%P"))
+        self.loop_count_entry.configure(validatecommand=(self.root.register(self._validate_int_positive), "%P"))
         self.loop_count_entry.pack(side=tk.LEFT, padx=2)
 
         ctk.CTkLabel(loop_frame, text="Pausa:").pack(side=tk.LEFT, padx=(10, 3))
         self.loop_delay_var = tk.StringVar(value=str(self.settings.get("loop_delay", 0)))
         self.loop_delay_entry = ctk.CTkEntry(loop_frame, textvariable=self.loop_delay_var, width=50, validate="key")
-        self.loop_delay_entry.config(validatecommand=(self.root.register(self._validate_int_non_negative), "%P"))
+        self.loop_delay_entry.configure(validatecommand=(self.root.register(self._validate_int_non_negative), "%P"))
         self.loop_delay_entry.pack(side=tk.LEFT, padx=2)
         ctk.CTkLabel(loop_frame, text="s").pack(side=tk.LEFT)
 
@@ -996,16 +996,16 @@ class OrchestratorApp:
     def _update_time_labels(self):
         total = self._calc_total_time()
         if total is None:
-            self.total_time_label.config(text="Total: ∞")
+            self.total_time_label.configure(text="Total: ∞")
         else:
-            self.total_time_label.config(text=f"Total: {format_time(total)}")
+            self.total_time_label.configure(text=f"Total: {format_time(total)}")
 
     def _on_loop_mode_change(self, event):
         mode = self.loop_mode_var.get()
         if mode == "infinite" or mode == "first_match":
-            self.loop_count_entry.config(state="disabled")
+            self.loop_count_entry.configure(state="disabled")
         else:
-            self.loop_count_entry.config(state="normal")
+            self.loop_count_entry.configure(state="normal")
         self._update_time_labels()
 
     # ═══════════════════════════════════════════════════════════════
@@ -2398,7 +2398,7 @@ class OrchestratorApp:
         def update_preview(*args):
             total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
             total = max(total, 0)
-            time_preview.config(text=f"Tiempo: {format_time(total)}")
+            time_preview.configure(text=f"Tiempo: {format_time(total)}")
 
         reps_var.trace_add("write", update_preview)
         dur_var.trace_add("write", update_preview)
@@ -2527,7 +2527,7 @@ class OrchestratorApp:
         def update_preview(*args):
             total = (dur_var.get() + pause_var.get()) * reps_var.get() - pause_var.get()
             total = max(total, 0)
-            time_preview.config(text=f"Tiempo: {format_time(total)}")
+            time_preview.configure(text=f"Tiempo: {format_time(total)}")
 
         reps_var.trace_add("write", update_preview)
         dur_var.trace_add("write", update_preview)
@@ -3245,7 +3245,7 @@ class OrchestratorApp:
         elapsed = time.time() - self._exec_start_time
         if self._exec_total_time is not None:
             remaining = max(self._exec_total_time - elapsed, 0)
-            self.countdown_label.config(text=f"⏱️ {format_time(int(remaining))}")
+            self.countdown_label.configure(text=f"⏱️ {format_time(int(remaining))}")
             prog = min(int(elapsed), self._exec_total_time)
             self._update_progress(prog, self._exec_total_time)
 
@@ -3262,7 +3262,7 @@ class OrchestratorApp:
             elapsed = time.time() - self._exec_start_time
             item_elapsed = time.time() - self._cur_item_start_time
             item_remaining = max(self._cur_item_total_time - item_elapsed, 0)
-            self.countdown_label.config(
+            self.countdown_label.configure(
                 text=f"⏱️ -{format_time(int(item_remaining))} │ {format_time(int(elapsed))}"
             )
             if self.mini_bar is not None and self.mini_bar.is_visible():

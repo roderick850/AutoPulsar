@@ -237,23 +237,23 @@ class MacroEditorWindow(ctk.CTkToplevel):
     def _start_recording(self):
         self._recorded_actions = []
         self._recording = True
-        self._btn_rec.config(text="⏹️ Detener")
+        self._btn_rec.configure(text="⏹️ Detener")
         self.status_text.set("GRABANDO — presiona teclas, haz clicks...")
-        self._status_label.config(foreground=C["red"])
+        self._status_label.configure(text_color=C["red"])
 
         try:
             self.recorder.start()
         except RuntimeError as e:
             self.status_text.set(f"Error: {e}")
             self._recording = False
-            self._btn_rec.config(text="⏺️ Grabar")
+            self._btn_rec.configure(text="⏺️ Grabar")
 
     def _stop_recording(self):
         self._recording = False
         events = self.recorder.stop()
-        self._btn_rec.config(text="⏺️ Grabar")
+        self._btn_rec.configure(text="⏺️ Grabar")
         self.status_text.set("Listo")
-        self._status_label.config(foreground=C["text2"])
+        self._status_label.configure(text_color=C["text2"])
 
         if events:
             self._recorded_actions = events_to_actions(events)
@@ -278,7 +278,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
         events = actions_to_events(self.actions)
         self._playing = True
-        self._btn_play.config(text="⏸️ Reproduciendo...", state="disabled")
+        self._btn_play.configure(text="⏸️ Reproduciendo...", state="disabled")
 
         def on_event(idx, ev):
             key = ev.get("key") or ev.get("button") or ""
@@ -289,7 +289,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
 
         def on_finish():
             self._playing = False
-            self._btn_play.config(text="▶️ Probar", state="normal")
+            self._btn_play.configure(text="▶️ Probar", state="normal")
             self.status_text.set("Reproducción completada")
 
         self._player = MacroPlayer(events, callbacks={"on_event": on_event, "on_finish": on_finish})
@@ -395,7 +395,7 @@ class MacroEditorWindow(ctk.CTkToplevel):
             w.destroy()
         self._row_widgets = []
 
-        self._counter_label.config(text=f"{len(self.actions)} acciones")
+        self._counter_label.configure(text=f"{len(self.actions)} acciones")
 
         if not self.actions:
             ctk.CTkLabel(self._inner, text="(sin acciones — graba o añade manualmente)", padding=20).pack()
